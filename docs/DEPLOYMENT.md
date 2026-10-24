@@ -19,7 +19,7 @@ docker compose logs --tail 50 pact
 docker compose down
 ```
 
-本机没有 Docker，因此本机不声称跑过容器。CI 配置会构建镜像并运行真实 HTTP 烟测，是否成功以实际 CI 记录为准。
+本机没有 Docker，因此本机不声称跑过容器。[CI运行40069404218](https://github.com/ThreshoLdnnis/pact-v2/actions/runs/40069404218) 已完成镜像构建、Compose启动、健康检查和真实HTTP烟测，docker-smoke全部步骤成功。证据见reports/ci-verification.json。
 
 ## 配置
 

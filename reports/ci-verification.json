@@ -1,0 +1,115 @@
+{
+  "checked_on": "2026-10-24",
+  "commit": "4ba4d75c2e67e207580487d324e93d80e2e2209b",
+  "run_url": "https://github.com/ThreshoLdnnis/pact-v2/actions/runs/40069404218",
+  "jobs": [
+    {
+      "name": "test-and-build",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run pip install -r requirements-dev.txt",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run python -m pytest --junitxml=reports/tests.xml",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run python scripts/export_contracts.py",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run git diff --exit-code -- contracts apps/workbench/src/protocol.ts",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run npm ci && npm run build && npm audit",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run python -m pip_audit -r requirements.txt --no-deps --disable-pip -f json -o reports/pip-audit.json",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "docker-smoke",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run docker compose up --build -d",
+          "conclusion": "success"
+        },
+        {
+          "name": "Wait for health",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run python scripts/smoke_http.py",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run docker compose logs --tail 100",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run docker compose down -v",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ]
+}
