@@ -1,0 +1,25 @@
+name: Repository checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repo-checks:
+    name: repo-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check commit whitespace
+        run: git show --format= --check HEAD
+      - name: Validate team registry JSON
+        run: python3 -m json.tool docs/team.json > /dev/null

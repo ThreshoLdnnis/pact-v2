@@ -1,0 +1,32 @@
+# Local environments and credentials
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+node_modules/
+__pycache__/
+*.py[cod]
+*.pem
+*.key
+*.p12
+credentials*.json
+
+# Generated data, builds and tooling
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage/
+dist/
+build/
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
