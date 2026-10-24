@@ -15,10 +15,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from sqlalchemy import select, func
-from contracts.models import AccountList, ApprovalDecision, BankingCommand, BankingExecutionResult, CandidatePlan, DemoLogin, ExecutionReceipt, PlanInput, PolicyCommand, PolicyEvaluation, ReadResult, ReceiptVerification, TaskPlan
+from contracts.models import AccountList, ApprovalDecision, BankingCommand, BankingExecutionResult, CandidatePlan, DemoLogin, ExecutionReceipt, HandoffInput, HandoffRelease, PlanInput, PolicyCommand, PolicyEvaluation, ReadResult, ReceiptVerification, RecipientSelection, TaskPlan
 from pact.audit import record, verify_chain
 from pact.common import DomainError, digest, now, stamp, uid
-from pact.storage import Account, ApprovalRow, Audit, Commitment, Database, Ledger, PlanRow, SessionRow
+from pact.storage import Account, ApprovalRow, Audit, Commitment, Database, Ledger, PlanRow, SessionRow, Subscription
 from services.agent import engine, planner
 from services.banking import service as bank
 
@@ -68,7 +68,7 @@ def create_app(database_url=None, scheduler=True):
                 await task
         db.engine.dispose()
 
-    app = FastAPI(title="PACT V2.0 Sandbox", version="0.1.0", lifespan=lifespan, description="仅合成数据的银行 Agent MVP。候选计划与银行工具 API 分离；模型不具备执行权限。")
+    app = FastAPI(title="PACT V2.0 Sandbox", version="0.2.0", lifespan=lifespan, description="仅合成数据的银行 Agent MVP。候选计划与银行工具 API 分离；模型不具备执行权限。")
     app.state.db = db
     app.add_middleware(BodyLimitMiddleware)
     app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type"])
@@ -133,12 +133,14 @@ def create_app(database_url=None, scheduler=True):
         with db.session() as session:
             account = session.scalars(select(Account).where(Account.user_id == user)).first()
             recipients = bank.read_tool(session, user, {"tool": "recipients", "account_id": account.id})["items"]
-            subs = bank.read_tool(session, user, {"tool": "subscriptions", "account_id": account.id})["items"]
+            # Only resolve a user-named cancellation target. Never send an unapproved
+            # subscription inventory or amounts/status to the optional model.
+            subs = [{"subscription_id": x.id, "name": x.name} for x in session.scalars(select(Subscription).where(Subscription.user_id == user, Subscription.account_id == account.id)) if "取消" in message and x.name in message]
         return planner.parse(message, account.id, recipients, subs)
 
     @app.get("/health", tags=["System"])
     def health():
-        return {"status": "ok", "sandbox": True, "version": "0.1.0"}
+        return {"status": "ok", "sandbox": True, "version": "0.2.0"}
 
     @app.get("/api/v1/meta", tags=["System"])
     def meta():
@@ -201,8 +203,9 @@ def create_app(database_url=None, scheduler=True):
     def pause(plan_id: str, user=Depends(principal)):
         def op(session):
             row, plan = engine.get_plan(session, user, plan_id)
-            if plan.status in {"succeeded", "failed"}:
+            if plan.status in {"succeeded", "failed", "partially_completed", "pending_verification", "handed_off"}:
                 raise DomainError("TERMINAL_PLAN", "终态计划不能暂停")
+            engine.expire_approvals(session, user, plan_id)
             plan.status = "paused"
             engine.save(row, plan)
             record(session, user, "plan.paused", plan_id)
@@ -214,16 +217,34 @@ def create_app(database_url=None, scheduler=True):
         candidate, source = candidate_for(user, command.message)
         return mutate(user, lambda s: engine.replan(s, user, plan_id, candidate, source))
 
+    @app.post("/api/v1/agent/plans/{plan_id}/select-recipient", response_model=TaskPlan, tags=["Agent Task Protocol"])
+    def select_recipient(plan_id: str, command: RecipientSelection, user=Depends(principal)):
+        return mutate(user, lambda s: engine.select_recipient(s, user, plan_id, command))
+
+    @app.post("/api/v1/agent/plans/{plan_id}/reconcile", response_model=TaskPlan, tags=["Agent Task Protocol"])
+    def reconcile_plan(plan_id: str, user=Depends(principal)):
+        return mutate(user, lambda s: engine.reconcile_plan(s, user, plan_id))
+
+    @app.post("/api/v1/agent/plans/{plan_id}/handoff", response_model=TaskPlan, tags=["Agent Task Protocol"])
+    def handoff(plan_id: str, command: HandoffInput, user=Depends(principal)):
+        return mutate(user, lambda s: engine.handoff_plan(s, user, plan_id, command))
+
+    @app.post("/api/v1/agent/plans/{plan_id}/handoff/release", response_model=TaskPlan, tags=["Agent Task Protocol"])
+    def release_handoff(plan_id: str, command: HandoffRelease, user=Depends(principal)):
+        return mutate(user, lambda s: engine.release_handoff(s, user, plan_id, command))
+
     @app.get("/api/v1/banking/accounts", response_model=AccountList, tags=["Banking Tool API"])
     def accounts(user=Depends(principal)):
         with db.session() as session:
             return {"items": [bank.account_view(a) for a in session.scalars(select(Account).where(Account.user_id == user))]}
 
     @app.get("/api/v1/banking/accounts/{account_id}/{resource}", response_model=ReadResult, tags=["Banking Tool API"])
-    def banking_read(account_id: str, resource: str, user=Depends(principal)):
+    def banking_read(account_id: str, resource: str, receipt_id: str | None = None, user=Depends(principal)):
         if resource not in {"balance", "transactions", "analyze_bills", "subscriptions", "commitments", "recipients"}:
             raise DomainError("NOT_FOUND", "读取工具不存在", 404)
         with db.session() as session:
+            if resource == "subscriptions":
+                return bank.subscription_snapshot(session, user, account_id, receipt_id)
             return bank.read_tool(session, user, {"tool": resource, "account_id": account_id})
 
     @app.post("/api/v1/banking/execute", response_model=BankingExecutionResult, tags=["Banking Tool API"])
@@ -253,8 +274,15 @@ def create_app(database_url=None, scheduler=True):
     def graph(user=Depends(principal)):
         with db.session() as session:
             accounts = session.scalars(select(Account).where(Account.user_id == user)).all()
-            commitments = session.scalars(select(Commitment).where(Commitment.user_id == user, Commitment.status == "active")).all()
-            return {"nodes": [{"id": a.id, "kind": "account", "label": a.name, "constraints": bank.snapshot(session, user, a.id)} for a in accounts] + [{"id": c.id, "kind": c.kind, "label": c.name, "amount_cents": c.amount_cents, "due_at": c.due_at} for c in commitments], "edges": [{"from": c.account_id, "to": c.id, "kind": "reserves", "amount_cents": c.amount_cents} for c in commitments]}
+            commitments = session.scalars(select(Commitment).where(Commitment.user_id == user, Commitment.status == "active", Commitment.kind != "subscription")).all()
+            nodes = [{"id": a.id, "kind": "account", "label": a.name, "constraints": bank.snapshot(session, user, a.id)} for a in accounts] + [{"id": c.id, "kind": c.kind, "label": c.name, "amount_cents": c.amount_cents, "due_at": c.due_at} for c in commitments]
+            edges = [{"from": c.account_id, "to": c.id, "kind": "reserves", "amount_cents": c.amount_cents} for c in commitments]
+            for a in accounts:
+                amount = session.scalar(select(func.coalesce(func.sum(Commitment.amount_cents), 0)).where(Commitment.account_id == a.id, Commitment.kind == "subscription", Commitment.status == "active"))
+                if amount:
+                    nodes.append({"id": a.id + "-subscription-reserve", "kind": "subscription_summary", "label": "订阅预留合计（详情需确认查询）", "amount_cents": amount})
+                    edges.append({"from": a.id, "to": a.id + "-subscription-reserve", "kind": "reserves", "amount_cents": amount})
+            return {"nodes": nodes, "edges": edges}
 
     @app.post("/api/v1/banking/schedules/prepare-due", tags=["Banking Tool API"])
     def due(user=Depends(principal)):

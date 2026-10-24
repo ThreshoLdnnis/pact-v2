@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 Money = Annotated[StrictInt, Field(ge=1, le=100_000_000)]
 Identifier = Annotated[str, Field(pattern=r"^[a-zA-Z0-9_-]{1,80}$")]
-State = Literal["planned", "waiting_approval", "executing", "succeeded", "failed", "paused"]
+State = Literal["planned", "waiting_approval", "waiting_clarification", "executing", "pending_verification", "partially_completed", "handed_off", "succeeded", "failed", "paused"]
 
 
 class Closed(BaseModel):
@@ -21,16 +21,25 @@ class ReadAction(AccountAction):
     period: Literal["month", "30d"] = "month"
 
 
-class TransferAction(AccountAction):
+class RecipientTarget(AccountAction):
+    recipient_id: Identifier | None = None
+    recipient_query: Annotated[str, Field(min_length=1, max_length=80)] | None = Field(default=None, exclude_if=lambda value: value is None)
+
+    @model_validator(mode="after")
+    def one_target(self):
+        if (self.recipient_id is None) == (self.recipient_query is None):
+            raise ValueError("exactly one recipient_id or recipient_query is required")
+        return self
+
+
+class TransferAction(RecipientTarget):
     tool: Literal["transfer"]
-    recipient_id: Identifier
     amount_cents: Money
     commitment_id: Identifier | None = None
 
 
-class ScheduleAction(AccountAction):
+class ScheduleAction(RecipientTarget):
     tool: Literal["schedule_transfer"]
-    recipient_id: Identifier
     amount_cents: Money
     due_at: datetime
 
@@ -76,6 +85,37 @@ class CandidatePlan(Closed):
         return self
 
 
+class RecipientOption(Closed):
+    recipient_id: Identifier
+    name: str
+    account_hint: str
+
+
+class RecipientClarification(Closed):
+    clarification_id: str
+    query: str
+    options: list[RecipientOption]
+    expires_at: str
+
+
+class HandoffRecord(Closed):
+    handoff_id: str
+    requested_by: str
+    reason: str
+    created_at: str
+    prior_status: State
+    status: Literal["active", "released"] = "active"
+    released_at: str | None = None
+    resolution_note: str | None = None
+
+
+class PlanProgress(Closed):
+    completed: int = 0
+    failed: int = 0
+    pending_verification: int = 0
+    remaining: int = 0
+
+
 class TaskStep(CandidateStep):
     status: State = "planned"
     risk_level: Literal["green", "yellow", "red"] | None = None
@@ -83,10 +123,11 @@ class TaskStep(CandidateStep):
     receipt_id: str | None = None
     result: dict | None = None
     error: dict | None = None
+    clarification: RecipientClarification | None = None
 
 
 class TaskPlan(Closed):
-    schema_version: Literal["0.1"] = "0.1"
+    schema_version: Literal["0.1", "0.2"] = "0.2"
     plan_id: str
     version: int = 1
     title: str
@@ -95,6 +136,8 @@ class TaskPlan(Closed):
     status: State = "planned"
     steps: list[TaskStep]
     created_at: str
+    progress: PlanProgress = Field(default_factory=PlanProgress)
+    handoff: HandoffRecord | None = None
 
 
 class ApprovalRequest(Closed):
@@ -108,6 +151,7 @@ class ApprovalRequest(Closed):
     expires_at: str
     reason: str
     action: dict
+    scope_hash: str | None = None
 
 
 class ExecutionReceipt(Closed):
@@ -148,6 +192,23 @@ class BankingCommand(Closed):
 class PolicyCommand(Closed):
     plan_id: str
     step_id: str
+
+
+class RecipientSelection(Closed):
+    plan_version: StrictInt
+    step_id: Identifier
+    clarification_id: str
+    recipient_id: Identifier
+
+
+class HandoffInput(Closed):
+    plan_version: StrictInt
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class HandoffRelease(Closed):
+    plan_version: StrictInt
+    note: str = Field(min_length=1, max_length=500)
 
 
 class ConstraintSnapshot(Closed):
@@ -211,6 +272,7 @@ class TransactionList(Closed):
 class RecipientView(Closed):
     recipient_id: str
     name: str
+    account_hint: str
 
 
 class RecipientList(Closed):
@@ -226,6 +288,8 @@ class SubscriptionView(Closed):
 
 class SubscriptionList(Closed):
     items: list[SubscriptionView]
+    source_receipt_id: str | None = None
+    snapshot_at: str | None = None
 
 
 class CommitmentView(Closed):
@@ -242,6 +306,7 @@ class CommitmentView(Closed):
 class CommitmentList(Closed):
     items: list[CommitmentView]
     constraints: ConstraintSnapshot
+    subscription_reserved_cents: int = 0
 
 
 class BillsView(Closed):
@@ -254,6 +319,8 @@ class BillsView(Closed):
     categories: dict[str, int]
     transaction_count: int
     source: Literal["banking_ledger"]
+    transaction_ids: list[str] = Field(default_factory=list)
+    anomalies: list[dict[str, str]] = Field(default_factory=list)
 
 
 ReadResult = BalanceView | TransactionList | RecipientList | SubscriptionList | CommitmentList | BillsView

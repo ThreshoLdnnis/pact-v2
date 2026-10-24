@@ -45,7 +45,7 @@ def approve(client, auth, p):
 def finish(client, auth, p):
     for _ in range(15):
         p = run(client, auth, p)
-        if p["status"] in {"succeeded", "failed"}:
+        if p["status"] in {"succeeded", "failed", "partially_completed"}:
             return p
         assert p["status"] == "waiting_approval", p
         approve(client, auth, p)
@@ -62,11 +62,13 @@ def test_cross_scenario_dag_and_verified_receipts(client, auth):
     p = finish(client, auth, plan(client, auth, "分析本月账单，取消视频会员，再给张三转账500元，至少保留1000元"))
     assert p["status"] == "succeeded"
     assert [s["action"]["tool"] for s in p["steps"]] == ["analyze_bills", "cancel_subscription", "transfer"]
+    assert [s["depends_on"] for s in p["steps"]] == [[], ["s1"], ["s2"]]
     assert balance(client, auth) == before - 50000
     for step in p["steps"]:
         r = client.get(API + f"/banking/receipts/{step['receipt_id']}/verify", headers=auth)
         assert r.json()["verified"] is True
-    subs = client.get(API + "/banking/accounts/acct-alice/subscriptions", headers=auth).json()["items"]
+    query = finish(client, auth, plan(client, auth, "查询订阅"))
+    subs = client.get(API + "/banking/accounts/acct-alice/subscriptions", headers=auth, params={"receipt_id": query["steps"][0]["receipt_id"]}).json()["items"]
     assert next(s for s in subs if s["subscription_id"] == "sub-video")["active"] is False
     assert client.get(API + "/banking/reconciliation", headers=auth).json()["balanced"]
     assert client.get(API + "/audit", headers=auth).json()["chain_valid"]
@@ -209,7 +211,7 @@ def test_pause_restart_resume(client, auth, app):
 
 def test_replan_preserves_completed_steps_and_invalidates_approvals(client, auth):
     p = finish(client, auth, plan(client, auth, "分析账单，取消视频会员，给张三转账99999元"))
-    assert p["status"] == "failed"
+    assert p["status"] == "partially_completed"
     retained = [s["receipt_id"] for s in p["steps"] if s["status"] == "succeeded"]
     r = client.post(API + f"/agent/plans/{p['plan_id']}/replan", headers=auth, json={"message": "分析账单，取消视频会员，给张三转账50元"})
     assert r.status_code == 200, r.text

@@ -1,11 +1,11 @@
 {
   "workflow": "analysis -> cancellation -> transfer",
   "status": "passed",
-  "plan_id": "plan_257b6f92fd534b7aae749cd7637fc0a1",
+  "plan_id": "plan_3dde88ebfc404de7b1f0a861eb48ea1d",
   "receipt_ids": [
-    "rec_231661b71cf4409d9ed4dd9e69e6edb6",
-    "rec_7d2d1eb5432940dfbdcc43d4d6c36613",
-    "rec_be67475e15ba444fa062a64bb056a895"
+    "rec_eff4ad5757734668b6c80fc39d2eaaba",
+    "rec_291d90cca76c44cc99d469c3aebc22ed",
+    "rec_4876c3a79b5a4a2abb4b352a4e8d8b0f"
   ],
   "balance_delta_cents": -50000,
   "verified": true

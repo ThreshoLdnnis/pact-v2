@@ -1406,3 +1406,15 @@ footer a {
     font-size: 8px;
   }
 }
+
+.progress-summary { color: #596b65; font-size: 12px; line-height: 1.7; }
+.pending-panel, .clarification-panel { border-color: #c6984b; }
+.state.pending_verification, .state.waiting_clarification, .state.partially_completed { background: #fff0cf; color: #795213; }
+.state.handed_off { background: #e8e5f7; color: #554573; }
+.dag li.pending_verification .step-number, .dag li.waiting_clarification .step-number { background: #fff0cf; color: #795213; }
+.handoff-panel p, .pending-panel p, .clarification-panel p { font-size: 12px; line-height: 1.8; color: #596b65; }
+.handoff-panel textarea { width: 100%; resize: vertical; padding: 10px; margin: 8px 0 12px; font: inherit; border: 1px solid #d1d9d0; border-radius: 8px; }
+.recipient-choice, .subscription-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 12px; margin-top: 8px; border: 1px solid #d1d9d0; border-radius: 8px; width: 100%; }
+.recipient-choice { background: #fffdf7; text-align: left; cursor: pointer; }
+.recipient-choice span, .recipient-choice small, .subscription-row small { font-size: 11px; color: #596b65; }
+.subscription-row small { display: block; margin-top: 5px; }

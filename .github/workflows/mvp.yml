@@ -51,6 +51,7 @@ jobs:
           done
           curl --fail http://127.0.0.1:8000/health
       - run: python scripts/smoke_http.py
+      - run: python scripts/smoke_business.py
       - run: docker compose logs --tail 100
         if: always()
       - run: docker compose down -v

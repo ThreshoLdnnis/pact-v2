@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "PACT Task Protocol 0.1",
+  "title": "PACT Task Protocol 0.2",
   "$defs": {
     "CancelAction": {
       "additionalProperties": false,
@@ -130,14 +130,36 @@
           "title": "Account Id",
           "type": "string"
         },
+        "recipient_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recipient Id"
+        },
+        "recipient_query": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recipient Query"
+        },
         "tool": {
           "const": "schedule_transfer",
           "title": "Tool",
-          "type": "string"
-        },
-        "recipient_id": {
-          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
-          "title": "Recipient Id",
           "type": "string"
         },
         "amount_cents": {
@@ -155,7 +177,6 @@
       "required": [
         "account_id",
         "tool",
-        "recipient_id",
         "amount_cents",
         "due_at"
       ],
@@ -170,14 +191,36 @@
           "title": "Account Id",
           "type": "string"
         },
+        "recipient_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recipient Id"
+        },
+        "recipient_query": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recipient Query"
+        },
         "tool": {
           "const": "transfer",
           "title": "Tool",
-          "type": "string"
-        },
-        "recipient_id": {
-          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
-          "title": "Recipient Id",
           "type": "string"
         },
         "amount_cents": {
@@ -203,7 +246,6 @@
       "required": [
         "account_id",
         "tool",
-        "recipient_id",
         "amount_cents"
       ],
       "title": "TransferAction",
@@ -240,6 +282,169 @@
         "steps"
       ],
       "title": "CandidatePlan",
+      "type": "object"
+    },
+    "HandoffRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "handoff_id": {
+          "title": "Handoff Id",
+          "type": "string"
+        },
+        "requested_by": {
+          "title": "Requested By",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "prior_status": {
+          "enum": [
+            "planned",
+            "waiting_approval",
+            "waiting_clarification",
+            "executing",
+            "pending_verification",
+            "partially_completed",
+            "handed_off",
+            "succeeded",
+            "failed",
+            "paused"
+          ],
+          "title": "Prior Status",
+          "type": "string"
+        },
+        "status": {
+          "default": "active",
+          "enum": [
+            "active",
+            "released"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "released_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Released At"
+        },
+        "resolution_note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolution Note"
+        }
+      },
+      "required": [
+        "handoff_id",
+        "requested_by",
+        "reason",
+        "created_at",
+        "prior_status"
+      ],
+      "title": "HandoffRecord",
+      "type": "object"
+    },
+    "PlanProgress": {
+      "additionalProperties": false,
+      "properties": {
+        "completed": {
+          "default": 0,
+          "title": "Completed",
+          "type": "integer"
+        },
+        "failed": {
+          "default": 0,
+          "title": "Failed",
+          "type": "integer"
+        },
+        "pending_verification": {
+          "default": 0,
+          "title": "Pending Verification",
+          "type": "integer"
+        },
+        "remaining": {
+          "default": 0,
+          "title": "Remaining",
+          "type": "integer"
+        }
+      },
+      "title": "PlanProgress",
+      "type": "object"
+    },
+    "RecipientClarification": {
+      "additionalProperties": false,
+      "properties": {
+        "clarification_id": {
+          "title": "Clarification Id",
+          "type": "string"
+        },
+        "query": {
+          "title": "Query",
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/RecipientOption"
+          },
+          "title": "Options",
+          "type": "array"
+        },
+        "expires_at": {
+          "title": "Expires At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "clarification_id",
+        "query",
+        "options",
+        "expires_at"
+      ],
+      "title": "RecipientClarification",
+      "type": "object"
+    },
+    "RecipientOption": {
+      "additionalProperties": false,
+      "properties": {
+        "recipient_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Recipient Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "account_hint": {
+          "title": "Account Hint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "recipient_id",
+        "name",
+        "account_hint"
+      ],
+      "title": "RecipientOption",
       "type": "object"
     },
     "TaskStep": {
@@ -295,7 +500,11 @@
           "enum": [
             "planned",
             "waiting_approval",
+            "waiting_clarification",
             "executing",
+            "pending_verification",
+            "partially_completed",
+            "handed_off",
             "succeeded",
             "failed",
             "paused"
@@ -369,6 +578,17 @@
           ],
           "default": null,
           "title": "Error"
+        },
+        "clarification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RecipientClarification"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -382,8 +602,11 @@
       "additionalProperties": false,
       "properties": {
         "schema_version": {
-          "const": "0.1",
-          "default": "0.1",
+          "default": "0.2",
+          "enum": [
+            "0.1",
+            "0.2"
+          ],
           "title": "Schema Version",
           "type": "string"
         },
@@ -420,7 +643,11 @@
           "enum": [
             "planned",
             "waiting_approval",
+            "waiting_clarification",
             "executing",
+            "pending_verification",
+            "partially_completed",
+            "handed_off",
             "succeeded",
             "failed",
             "paused"
@@ -438,6 +665,20 @@
         "created_at": {
           "title": "Created At",
           "type": "string"
+        },
+        "progress": {
+          "$ref": "#/$defs/PlanProgress"
+        },
+        "handoff": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HandoffRecord"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -504,6 +745,18 @@
           "additionalProperties": true,
           "title": "Action",
           "type": "object"
+        },
+        "scope_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scope Hash"
         }
       },
       "required": [
@@ -654,6 +907,79 @@
       ],
       "title": "BankingCommand",
       "type": "object"
+    },
+    "RecipientSelection": {
+      "additionalProperties": false,
+      "properties": {
+        "plan_version": {
+          "title": "Plan Version",
+          "type": "integer"
+        },
+        "step_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Step Id",
+          "type": "string"
+        },
+        "clarification_id": {
+          "title": "Clarification Id",
+          "type": "string"
+        },
+        "recipient_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Recipient Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_version",
+        "step_id",
+        "clarification_id",
+        "recipient_id"
+      ],
+      "title": "RecipientSelection",
+      "type": "object"
+    },
+    "HandoffInput": {
+      "additionalProperties": false,
+      "properties": {
+        "plan_version": {
+          "title": "Plan Version",
+          "type": "integer"
+        },
+        "reason": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_version",
+        "reason"
+      ],
+      "title": "HandoffInput",
+      "type": "object"
+    },
+    "HandoffRelease": {
+      "additionalProperties": false,
+      "properties": {
+        "plan_version": {
+          "title": "Plan Version",
+          "type": "integer"
+        },
+        "note": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_version",
+        "note"
+      ],
+      "title": "HandoffRelease",
+      "type": "object"
     }
   },
   "oneOf": [
@@ -674,6 +1000,15 @@
     },
     {
       "$ref": "#/$defs/BankingCommand"
+    },
+    {
+      "$ref": "#/$defs/RecipientSelection"
+    },
+    {
+      "$ref": "#/$defs/HandoffInput"
+    },
+    {
+      "$ref": "#/$defs/HandoffRelease"
     }
   ]
 }

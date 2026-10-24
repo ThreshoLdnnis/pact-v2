@@ -6,6 +6,8 @@ READ_TOOLS = {"balance", "transactions", "analyze_bills", "subscriptions", "comm
 
 
 def evaluate(tool, amount_cents=0, spent_today_cents=0):
+    if tool == "subscriptions":
+        return {"level": "yellow", "reason": "订阅协议查询需要用户明确确认；仅授权本账户本次查询"}
     if tool in READ_TOOLS:
         return {"level": "green", "reason": "只读操作，可自动执行"}
     if tool == "cancel_subscription":

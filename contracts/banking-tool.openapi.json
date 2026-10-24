@@ -3,7 +3,7 @@
   "info": {
     "title": "PACT V2.0 Sandbox",
     "description": "仅合成数据的银行 Agent MVP。候选计划与银行工具 API 分离；模型不具备执行权限。",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "paths": {
     "/api/v1/banking/accounts": {
@@ -61,6 +61,22 @@
             "schema": {
               "type": "string",
               "title": "Resource"
+            }
+          },
+          {
+            "name": "receipt_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Receipt Id"
             }
           }
         ],
@@ -573,6 +589,23 @@
             "type": "string",
             "const": "banking_ledger",
             "title": "Source"
+          },
+          "transaction_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Transaction Ids"
+          },
+          "anomalies": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Anomalies"
           }
         },
         "additionalProperties": false,
@@ -717,6 +750,11 @@
           },
           "constraints": {
             "$ref": "#/components/schemas/ConstraintSnapshot"
+          },
+          "subscription_reserved_cents": {
+            "type": "integer",
+            "title": "Subscription Reserved Cents",
+            "default": 0
           }
         },
         "additionalProperties": false,
@@ -940,6 +978,125 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "HandoffInput": {
+        "properties": {
+          "plan_version": {
+            "type": "integer",
+            "title": "Plan Version"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "plan_version",
+          "reason"
+        ],
+        "title": "HandoffInput"
+      },
+      "HandoffRecord": {
+        "properties": {
+          "handoff_id": {
+            "type": "string",
+            "title": "Handoff Id"
+          },
+          "requested_by": {
+            "type": "string",
+            "title": "Requested By"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "prior_status": {
+            "type": "string",
+            "enum": [
+              "planned",
+              "waiting_approval",
+              "waiting_clarification",
+              "executing",
+              "pending_verification",
+              "partially_completed",
+              "handed_off",
+              "succeeded",
+              "failed",
+              "paused"
+            ],
+            "title": "Prior Status"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "released"
+            ],
+            "title": "Status",
+            "default": "active"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "resolution_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "handoff_id",
+          "requested_by",
+          "reason",
+          "created_at",
+          "prior_status"
+        ],
+        "title": "HandoffRecord"
+      },
+      "HandoffRelease": {
+        "properties": {
+          "plan_version": {
+            "type": "integer",
+            "title": "Plan Version"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "plan_version",
+          "note"
+        ],
+        "title": "HandoffRelease"
+      },
       "PlanInput": {
         "properties": {
           "message": {
@@ -955,6 +1112,33 @@
           "message"
         ],
         "title": "PlanInput"
+      },
+      "PlanProgress": {
+        "properties": {
+          "completed": {
+            "type": "integer",
+            "title": "Completed",
+            "default": 0
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed",
+            "default": 0
+          },
+          "pending_verification": {
+            "type": "integer",
+            "title": "Pending Verification",
+            "default": 0
+          },
+          "remaining": {
+            "type": "integer",
+            "title": "Remaining",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PlanProgress"
       },
       "PolicyCommand": {
         "properties": {
@@ -1085,6 +1269,38 @@
         ],
         "title": "ReceiptVerification"
       },
+      "RecipientClarification": {
+        "properties": {
+          "clarification_id": {
+            "type": "string",
+            "title": "Clarification Id"
+          },
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/RecipientOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "clarification_id",
+          "query",
+          "options",
+          "expires_at"
+        ],
+        "title": "RecipientClarification"
+      },
       "RecipientList": {
         "properties": {
           "items": {
@@ -1102,6 +1318,62 @@
         ],
         "title": "RecipientList"
       },
+      "RecipientOption": {
+        "properties": {
+          "recipient_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Recipient Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "account_hint": {
+            "type": "string",
+            "title": "Account Hint"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "recipient_id",
+          "name",
+          "account_hint"
+        ],
+        "title": "RecipientOption"
+      },
+      "RecipientSelection": {
+        "properties": {
+          "plan_version": {
+            "type": "integer",
+            "title": "Plan Version"
+          },
+          "step_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Step Id"
+          },
+          "clarification_id": {
+            "type": "string",
+            "title": "Clarification Id"
+          },
+          "recipient_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Recipient Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "plan_version",
+          "step_id",
+          "clarification_id",
+          "recipient_id"
+        ],
+        "title": "RecipientSelection"
+      },
       "RecipientView": {
         "properties": {
           "recipient_id": {
@@ -1111,13 +1383,18 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "account_hint": {
+            "type": "string",
+            "title": "Account Hint"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "recipient_id",
-          "name"
+          "name",
+          "account_hint"
         ],
         "title": "RecipientView"
       },
@@ -1128,15 +1405,35 @@
             "pattern": "^[a-zA-Z0-9_-]{1,80}$",
             "title": "Account Id"
           },
+          "recipient_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipient Id"
+          },
+          "recipient_query": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipient Query"
+          },
           "tool": {
             "type": "string",
             "const": "schedule_transfer",
             "title": "Tool"
-          },
-          "recipient_id": {
-            "type": "string",
-            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
-            "title": "Recipient Id"
           },
           "amount_cents": {
             "type": "integer",
@@ -1155,7 +1452,6 @@
         "required": [
           "account_id",
           "tool",
-          "recipient_id",
           "amount_cents",
           "due_at"
         ],
@@ -1169,6 +1465,28 @@
             },
             "type": "array",
             "title": "Items"
+          },
+          "source_receipt_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Receipt Id"
+          },
+          "snapshot_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot At"
           }
         },
         "additionalProperties": false,
@@ -1211,9 +1529,12 @@
         "properties": {
           "schema_version": {
             "type": "string",
-            "const": "0.1",
+            "enum": [
+              "0.1",
+              "0.2"
+            ],
             "title": "Schema Version",
-            "default": "0.1"
+            "default": "0.2"
           },
           "plan_id": {
             "type": "string",
@@ -1248,7 +1569,11 @@
             "enum": [
               "planned",
               "waiting_approval",
+              "waiting_clarification",
               "executing",
+              "pending_verification",
+              "partially_completed",
+              "handed_off",
               "succeeded",
               "failed",
               "paused"
@@ -1266,6 +1591,19 @@
           "created_at": {
             "type": "string",
             "title": "Created At"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/PlanProgress"
+          },
+          "handoff": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HandoffRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -1331,7 +1669,11 @@
             "enum": [
               "planned",
               "waiting_approval",
+              "waiting_clarification",
               "executing",
+              "pending_verification",
+              "partially_completed",
+              "handed_off",
               "succeeded",
               "failed",
               "paused"
@@ -1400,6 +1742,16 @@
               }
             ],
             "title": "Error"
+          },
+          "clarification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecipientClarification"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -1468,15 +1820,35 @@
             "pattern": "^[a-zA-Z0-9_-]{1,80}$",
             "title": "Account Id"
           },
+          "recipient_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipient Id"
+          },
+          "recipient_query": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipient Query"
+          },
           "tool": {
             "type": "string",
             "const": "transfer",
             "title": "Tool"
-          },
-          "recipient_id": {
-            "type": "string",
-            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
-            "title": "Recipient Id"
           },
           "amount_cents": {
             "type": "integer",
@@ -1502,7 +1874,6 @@
         "required": [
           "account_id",
           "tool",
-          "recipient_id",
           "amount_cents"
         ],
         "title": "TransferAction"

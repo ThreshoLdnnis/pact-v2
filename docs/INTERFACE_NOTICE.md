@@ -1,4 +1,18 @@
-# 协议0.1首次实现群同步稿
+# 协议0.2核心业务变更群同步稿
+
+本次变更已获当前聊天用户明确授权实现；尚未实际发送团队群，不宣称已完成团队评审或协议冻结。保留Draft PR供核对。
+
+用途：订阅查询黄色门禁、同名收款人选择、交易待核验、部分完成与人工接管。
+
+新增POST /api/v1/agent/plans/{id}/select-recipient、/reconcile、/handoff、/handoff/release；入参与响应见docs/API.md。GET subscriptions改为需要已确认查询的receipt_id并返回快照，未确认403；绿色承诺接口隐藏协议明细。新增状态及TaskPlan.progress/handoff、TaskStep.clarification、ApprovalRequest.scope_hash。模型仅允许候选字段。
+
+影响：Agent、Policy、Banking、工作台和测试/生成协议；旧客户端需更新状态枚举和订阅读取方式。没有新增端口。跨场景顺序、depends_on及跨DAG冲突机制不在本次变更范围。
+
+验证：tests/test_business_boundaries.py及原回归测试、生成协议一致性、TypeScript编译和实际浏览器操作。变更文档见BUSINESS_DAGS.md和STATE_MACHINE.md。群消息/负责人回复证据：待补。
+
+---
+
+## 历史：协议0.1首次实现稿
 
 状态：准备好的同步文案，尚未实际发到团队群，不代表团队已经确认。它随实现PR供评审，合并/冻结公共接口前需补充消息与回复证据。
 

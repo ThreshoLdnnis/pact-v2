@@ -58,6 +58,10 @@ const stateNames: Record<string, string> = {
   succeeded: "已核验完成",
   failed: "执行失败",
   paused: "已暂停",
+  waiting_clarification: "等待收款人选择",
+  pending_verification: "结果待核验",
+  partially_completed: "部分完成 · 已停止",
+  handed_off: "人工接管中",
 };
 const demoPrompts = [
   "分析本月账单，取消视频会员，再给张三转账500元，至少保留1000元",
@@ -94,6 +98,9 @@ function App() {
   const [demoCode, setDemoCode] = useState("");
   const [detail, setDetail] = useState<Verified>();
   const [planner, setPlanner] = useState("rules");
+  const [recipients, setRecipients] = useState<{recipient_id: string; name: string; account_hint: string}[]>([]);
+  const [handoffNote, setHandoffNote] = useState("请人工检查当前计划，保留真实交易记录");
+  const [uncertainPlan, setUncertainPlan] = useState("");
 
   async function api<T>(
     path: string,
@@ -101,7 +108,9 @@ function App() {
     body?: unknown,
     override?: string,
   ): Promise<T> {
-    const response = await fetch("/api/v1" + path, {
+    let response: Response;
+    try {
+    response = await fetch("/api/v1" + path, {
       method,
       headers: {
         "Content-Type": "application/json",
@@ -111,6 +120,11 @@ function App() {
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
+    } catch (cause) {
+      const match = path.match(/^\/agent\/plans\/([^/]+)\/(run|resume)$/);
+      if (method === "POST" && match) setUncertainPlan(match[1]);
+      throw cause;
+    }
     const data = await response.json();
     if (!response.ok) {
       if (response.status === 401 && path !== "/auth/demo-session") {
@@ -136,7 +150,7 @@ function App() {
   }
 
   async function refresh(auth = token) {
-    const [a, g, p, ap, au, meta] = await Promise.all([
+    const [a, g, p, ap, au, meta, rp] = await Promise.all([
       api<{ items: Account[] }>("/banking/accounts", "GET", undefined, auth),
       api<Graph>("/banking/commitment-graph", "GET", undefined, auth),
       api<{ items: TaskPlan[] }>("/agent/plans", "GET", undefined, auth),
@@ -148,6 +162,7 @@ function App() {
       ),
       api<AuditView>("/audit", "GET", undefined, auth),
       api<{ planner: string }>("/meta", "GET", undefined, auth),
+      api<{items: {recipient_id: string; name: string; account_hint: string}[]}>(`/banking/accounts/acct-${user}/recipients`, "GET", undefined, auth),
     ]);
     setAccount(a.items[0]);
     setGraph(g);
@@ -155,6 +170,7 @@ function App() {
     setApprovals(ap.items);
     setAudit(au);
     setPlanner(meta.planner);
+    setRecipients(rp.items);
   }
 
   useEffect(() => {
@@ -181,6 +197,14 @@ function App() {
         ? `计划已完成，${p.steps.length} 项后端回执已核验。`
         : state === "waiting_approval"
           ? "计划已检查，等待你授权当前步骤。模型不能替你确认或决定风险等级。"
+          : state === "pending_verification"
+            ? "原交易结果待核验。不会再次付款；请查询原回执或交人工处理。"
+          : state === "waiting_clarification"
+            ? "同名或未找到的收款人需要你澄清，尚未产生交易授权。"
+          : state === "partially_completed"
+            ? "计划部分完成后已停止。已发生的交易保持有效，后续步骤尚未完成。"
+          : state === "handed_off"
+            ? "已转入人工接管，旧审批失效，自动执行已冻结。"
           : state === "failed"
             ? "执行已停止。已完成步骤会保留，请查看失败原因后重规划。"
             : `计划${stateNames[state]}。`;
@@ -203,6 +227,7 @@ function App() {
       setChats((c) => [...c, { role: "user", text }]);
       setMessage("");
       const p = await api<TaskPlan>("/agent/plans", "POST", { message: text });
+      setPlan(p);
       showPlan(await api<TaskPlan>(`/agent/plans/${p.plan_id}/run`, "POST"));
       await refresh();
     });
@@ -225,6 +250,14 @@ function App() {
   );
   const bill = (billStep?.result as unknown as Verified)?.receipt?.data;
   const categories = (bill?.categories || {}) as Record<string, number>;
+  const clarificationStep = plan?.steps.find((s) => s.status === "waiting_clarification");
+  const subscriptions = (plan?.steps.find((s) => s.action.tool === "subscriptions" && s.status === "succeeded")?.result as unknown as Verified)?.receipt;
+
+  async function planOperation(path: string, body?: unknown) {
+    if (!plan) return;
+    showPlan(await api<TaskPlan>(`/agent/plans/${plan.plan_id}/${path}`, "POST", body));
+    await refresh();
+  }
 
   async function decision(approve: boolean) {
     if (!pending || !plan) return;
@@ -541,9 +574,23 @@ function App() {
                             <b>{money(amount)}</b>
                           </div>
                         ))}
+                        <p className="footnote">共 {String(bill.transaction_count)} 笔真实模拟流水；时间区间和来源交易编号见已核验回执。</p>
+                        {((bill.anomalies || []) as {transaction_id: string; reason: string}[]).map((item) => <p className="alert" key={item.transaction_id}>{item.transaction_id}：{item.reason}</p>)}
                       </section>
                     )}
-                    {plan?.status === "failed" && (
+                    {subscriptions && <section className="panel">
+                      <h2>已获确认的订阅查询快照</h2>
+                      <p className="footnote">查询于 {new Date(subscriptions.created_at).toLocaleString("zh-CN")}；取消需另行明确确认，不退回历史扣款。</p>
+                      {((subscriptions.data.items || []) as {subscription_id: string; name: string; amount_cents: number; active: boolean}[]).map((item) => <div className="subscription-row" key={item.subscription_id}>
+                        <div><b>{item.name}</b><small>{money(item.amount_cents)} · {item.active ? "协议有效（查询时）" : "协议已取消（查询时）"}</small></div>
+                        <button disabled={busy || !item.active} onClick={() => void perform(async () => {
+                          const p = await api<TaskPlan>("/agent/plans", "POST", {message: `取消${item.name}`});
+                          showPlan(await api<TaskPlan>(`/agent/plans/${p.plan_id}/run`, "POST"));
+                          await refresh();
+                        })}>申请取消</button>
+                      </div>)}
+                    </section>}
+                    {plan && ["failed", "partially_completed", "waiting_clarification"].includes(plan.status || "") && (
                       <section className="panel replan-panel">
                         <h2>根据最新状态重规划</h2>
                         <p>保留已核验步骤，重新检查资金约束，旧审批失效。</p>
@@ -595,6 +642,9 @@ function App() {
                             : "等待请求"}
                         </span>
                       </div>
+                      {uncertainPlan && <div className="alert" role="status">执行请求的响应未确认，界面状态可能过期。请先读取原计划，不要重复付款。
+                        <button disabled={busy} onClick={() => void perform(async () => { showPlan(await api<TaskPlan>(`/agent/plans/${uncertainPlan}`)); setUncertainPlan(""); await refresh(); })}>刷新原计划结果</button>
+                      </div>}
                       {!plan ? (
                         <div className="empty-dag">
                           <div>意图 → DAG → 授权 → 执行 → 回执</div>
@@ -610,6 +660,7 @@ function App() {
                               版本 {plan.version} · {plan.plan_id.slice(0, 17)}…
                             </small>
                           </div>
+                          <p className="progress-summary" aria-live="polite">已核验 {plan.progress?.completed || 0} · 失败 {plan.progress?.failed || 0} · 待核验 {plan.progress?.pending_verification || 0} · 未完成 {plan.progress?.remaining || 0}</p>
                           <ol className="dag">
                             {plan.steps.map((s, i) => (
                               <li key={s.step_id} className={s.status}>
@@ -682,7 +733,7 @@ function App() {
                             <button
                               disabled={
                                 busy ||
-                                ["succeeded", "failed", "paused"].includes(
+                                ["succeeded", "failed", "paused", "pending_verification", "partially_completed", "handed_off"].includes(
                                   plan.status || "",
                                 )
                               }
@@ -702,8 +753,8 @@ function App() {
                             </button>
                             <button
                               disabled={
-                                busy ||
-                                ["succeeded", "failed"].includes(
+                                busy || Boolean(uncertainPlan) ||
+                                ["succeeded", "failed", "pending_verification", "partially_completed", "handed_off", "waiting_clarification"].includes(
                                   plan.status || "",
                                 )
                               }
@@ -725,6 +776,28 @@ function App() {
                         </>
                       )}
                     </section>
+                    {clarificationStep?.clarification && <section className="panel clarification-panel" aria-label="收款人消歧">
+                      <h2>请核实同名收款人</h2>
+                      <p>“{clarificationStep.clarification.query}”对应下列已保存对象。选择只确定收款人，付款仍需后续授权。</p>
+                      {clarificationStep.clarification.options.length === 0 && <p>没有可选收款人，请调整请求或交人工处理。</p>}
+                      {clarificationStep.clarification.options.map((option) => <button className="recipient-choice" key={option.recipient_id} disabled={busy} onClick={() => void perform(async () => {
+                        const p = await api<TaskPlan>(`/agent/plans/${plan!.plan_id}/select-recipient`, "POST", {plan_version: plan!.version, step_id: clarificationStep.step_id, clarification_id: clarificationStep.clarification!.clarification_id, recipient_id: option.recipient_id});
+                        showPlan(await api<TaskPlan>(`/agent/plans/${p.plan_id}/run`, "POST"));
+                        await refresh();
+                      })}><b>{option.name}</b><span>{option.account_hint}</span><small>选择并继续检查 →</small></button>)}
+                    </section>}
+                    {plan && (plan.status === "pending_verification" || plan.steps.some((s) => s.status === "pending_verification")) && <section className="panel pending-panel" aria-label="交易待核验">
+                      <h2>交易结果待核验</h2><p>执行可能已发生，当前不宣告成功或失败。只查询原交易，不会重新付款，也不会自动继续后续步骤。</p>
+                      <button disabled={busy} className="primary" onClick={() => void perform(() => planOperation("reconcile"))}>查询原交易核验结果</button>
+                    </section>}
+                    {plan && plan.status !== "succeeded" && <section className="panel handoff-panel" aria-label="人工接管">
+                      <h2>{plan.status === "handed_off" ? "人工接管中" : "人工接管"}</h2>
+                      <p>本地演示由当前账户持有人处理；不会代替银行客服或将交易标记为成功。接管时冻结自动执行、作废旧审批。</p>
+                      {plan.handoff && <p className="footnote">接管记录：{plan.handoff.reason} · {plan.handoff.status === "active" ? "处理中" : "已交还"}</p>}
+                      <label htmlFor="handoff-note">处理说明</label>
+                      <textarea id="handoff-note" value={handoffNote} onChange={(e) => setHandoffNote(e.target.value)} maxLength={500} rows={2}/>
+                      <button disabled={busy || !handoffNote.trim()} onClick={() => void perform(() => planOperation(plan.status === "handed_off" ? "handoff/release" : "handoff", plan.status === "handed_off" ? {plan_version: plan.version, note: handoffNote} : {plan_version: plan.version, reason: handoffNote}))}>{plan.status === "handed_off" ? "记录处理说明并交还" : "暂停自动执行并接管"}</button>
+                    </section>}
                     {pending && (
                       <section
                         className={"approval-card " + pending.level}
@@ -744,6 +817,7 @@ function App() {
                           <strong>
                             {pending.action.amount_cents
                               ? money(pending.action.amount_cents as number)
+                              : pending.action.tool === "subscriptions" ? "确认查询本账户订阅协议快照"
                               : pending.action.subscription_id === "sub-video"
                                 ? "视频会员"
                                 : "音乐会员"}
@@ -755,7 +829,7 @@ function App() {
                         {Boolean(pending.action.recipient_id) && (
                           <p>
                             收款人：
-                            {({ "rcp-zhang": "张三", "rcp-li": "李四", "rcp-alice": "Alice" } as Record<string, string>)[String(pending.action.recipient_id)] || String(pending.action.recipient_id)}
+                            {(() => {const r = recipients.find((r) => r.recipient_id === pending.action.recipient_id); return r ? `${r.name} · ${r.account_hint}` : String(pending.action.recipient_id);})()}
                           </p>
                         )}
                         {Boolean(pending.action.due_at) && (
@@ -767,6 +841,7 @@ function App() {
                         <p>
                           本请求留存要求：{plan?.minimum_balance_cents ? money(plan.minimum_balance_cents) : "沿用账户基础留存"}，不会降低账户基础留存。
                         </p>
+                        {pending.action.tool === "cancel_subscription" && <p>仅取消该代扣协议及其尚未发生的扣款承诺，不代表退款或商户会员退订。</p>}
                         {pending.level === "red" && (
                           <div className="challenge">
                             <button
@@ -802,7 +877,7 @@ function App() {
                         )}
                         <div className="approval-buttons">
                           <button
-                            disabled={busy}
+                            disabled={busy || Boolean(uncertainPlan)}
                             onClick={() => void decision(false)}
                           >
                             拒绝
@@ -810,7 +885,7 @@ function App() {
                           <button
                             className="primary"
                             disabled={
-                              busy ||
+                              busy || Boolean(uncertainPlan) ||
                               (pending.level === "red" && code.length !== 6)
                             }
                             onClick={() => void decision(true)}
@@ -909,6 +984,7 @@ function App() {
                           <span className="commitment-kind">
                             {n.kind === "scheduled_transfer"
                               ? "定时转账 · 尚未付款"
+                              : n.kind === "subscription_summary" ? "汇总预留 · 查询详情需确认"
                               : n.kind === "subscription"
                                 ? "下次订阅扣款"
                                 : "已登记账单"}
