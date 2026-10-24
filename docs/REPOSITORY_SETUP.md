@@ -16,11 +16,11 @@
 | 项目 | 状态 |
 | --- | --- |
 | 本地仓库基础文件 | 已准备；JSON 格式、Markdown 本地链接与暂存空白检查通过 |
-| 远程仓库 | 已创建私有仓库；准备材料通过独立准备分支/PR 提交，合并前 main 保留初始 README |
+| 远程仓库 | 已创建私有仓库；25 个准备文件已上传至 chore/team-setup，见 [PR #6](https://github.com/ThreshoLdnnis/pact-v2/pull/6)；待非作者审核合并 |
 | 默认分支 | 已核验为 main |
 | 合并选项 | 已核验：仅 squash，自动删除已合并分支 |
 | 主干保护 | GitHub 页面明确提示当前私有仓库规则不会强制生效；未宣告启用 |
-| CI 首次运行 | 准备 PR 建立后核验 GitHub Actions；工作流仅作仓库格式检查 |
+| CI 首次运行 | [Repository checks 第 1 次运行](https://github.com/ThreshoLdnnis/pact-v2/actions/runs/40064768137) 成功；仅代表仓库格式检查通过 |
 | A / ThreshoLdnnis | 用户确认负责 A |
 | B / Clement-xi | 已发送邀请，GitHub 页面显示 Pending Invite；待本人接受 |
 | C / morebadly | 已发送邀请，GitHub 页面显示 Pending Invite；待本人接受 |
@@ -32,7 +32,11 @@
 1. GitHub 邮箱二次验证已通过，B/C 邀请已发出；成员接受后核验写权限，再启用具体 CODEOWNERS 规则并分配 Issue。
 2. 经用户明确同意，现有 ChatGPT Codex Connector 的“仅选定仓库”范围仅新增 pact-v2；原有选定项保留。连接器已成功读取此私有仓库并核验权限。
 3. 本机 Git 尚无可用的非交互式凭据；本批上传通过已授权连接器完成。成员在各自本机用标准 GitHub 登录后克隆，不共享 Token。
-4. 准备分支名为 `chore/team-setup`，以 GitHub 远程初始提交为父提交建立 PR，未强推 main。若使用早期本地准备副本，在配置好本机 Git 登录后应先拉取并切换到远程准备分支，不要将未同步的本地根提交直接推到 main。
+4. 本地工作分支为 `chore/team-setup`，已按 GitHub 对象哈希核验并同步远程准备分支；早期本地根提交保留在 `local/bootstrap-backup`。PR 基于远程初始提交，未强推 main。成员接受邀请后可克隆此准备分支参与评审；合并后从最新 main 开始自己的任务分支。
+
+```bash
+git clone --branch chore/team-setup https://github.com/ThreshoLdnnis/pact-v2.git
+```
 
 ## 平台限制说明
 
