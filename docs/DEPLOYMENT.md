@@ -27,7 +27,7 @@ docker compose ps
 docker compose down
 ```
 
-Compose主机端口仅127.0.0.1，容器非root、只读根目录、丢弃能力，数据卷挂载/app/data。模型变量由Compose环境传入，不拷贝.env到镜像。0.4本机没有Docker运行证据，历史0.1 CI仅作历史记录；2026-10-25恢复GitHub整理，本轮CI结果需以PR #8实际运行记录为准。
+Compose主机端口仅127.0.0.1，容器非root、只读根目录、丢弃能力，数据卷挂载/app/data。模型变量由Compose环境传入，不拷贝.env到镜像。0.4本机未安装Docker；[本轮GitHub CI](https://github.com/ThreshoLdnnis/pact-v2/actions/runs/40113574011)已完成镜像构建、Compose启动及四组HTTP脚本（共20场景）。代码提交8860889，证据为reports/ci-verification-0.4.json。历史0.1记录不作为本版证据。
 
 ## 数据恢复与升级
 

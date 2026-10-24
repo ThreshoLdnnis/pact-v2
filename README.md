@@ -10,7 +10,19 @@ Proactive Agent for Commitments & Transactions
 
 部署包含已构建工作台与 Windows x64 / CPython 3.12 的离线依赖；该环境首次安装无需联网、Node 或 Codex。需要本机安装 Python 3.12。Python 其他版本（3.12以上）、Linux/macOS 使用锁定 requirements.txt 在线安装，随后可运行 `sh start-pact.sh`。本轮实际完成 Windows 干净目录、独立环境、断网安装、HTTP 与重启验收，详见 [验收清单](docs/MVP_ACCEPTANCE.md)。
 
-也支持 `docker compose up --build -d`。本机无 Docker，0.4 容器运行尚未验证；历史 CI 不能替代本版验收。
+也支持 `docker compose up --build -d`。本机无Docker；0.4已在[GitHub CI](https://github.com/ThreshoLdnnis/pact-v2/actions/runs/40113574011)完成Docker构建、启动及20组HTTP场景，见reports/ci-verification-0.4.json。
+
+## 从GitHub获取源码
+
+团队在本轮评审分支开发，main尚未合并。需要Python 3.12+、Node 24+：
+
+```bash
+git clone --branch feat/pact-mvp https://github.com/ThreshoLdnnis/pact-v2.git
+cd pact-v2
+python scripts/bootstrap.py
+```
+
+然后Windows运行 `start-pact.cmd`，Linux/macOS运行 `sh start-pact.sh`，访问127.0.0.1:8000。源码首次安装和前端构建需要联网；Windows离线依赖只随本地交付ZIP提供，未把运行环境或密钥放进Git仓库。
 
 ## 六分钟演示
 

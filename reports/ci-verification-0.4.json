@@ -1,0 +1,34 @@
+{
+  "version": "0.4.0",
+  "checked_on": "2026-10-25",
+  "repository": "ThreshoLdnnis/pact-v2",
+  "validated_code_commit": "88608894e6b0901cb72d500c9bd06ddf7f814ed4",
+  "source_tree": "8efb55a39c50b55999e6109f4025d495b1cfdaec",
+  "repository_checks": {
+    "run_id": 40113573990,
+    "conclusion": "success"
+  },
+  "mvp_validation": {
+    "run_id": 40113574011,
+    "url": "https://github.com/ThreshoLdnnis/pact-v2/actions/runs/40113574011",
+    "conclusion": "success",
+    "jobs": {
+      "test-and-build": "success",
+      "docker-smoke": "success"
+    }
+  },
+  "scope": [
+    "unit/security/integration tests",
+    "generated protocols consistent",
+    "TypeScript/Vite and dependency checks",
+    "Docker Compose build/start",
+    "main, business, sandbox and context HTTP suites: 20 cases"
+  ],
+  "limitations": [
+    "not a browser-click test",
+    "not broad live-model evaluation",
+    "not official contest acceptance"
+  ],
+  "main_merged": false,
+  "credential_uploaded": false
+}

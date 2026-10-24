@@ -17,7 +17,7 @@
 | Windows x64/CPython3.12独立离线包 | 通过 | 新目录、新venv、PIP_NO_INDEX=1、19个哈希锁定wheel |
 | 重启恢复 | 通过 | 会话、任务、待澄清及其选择，independent-deployment.json |
 | 技术文档/部署/答辩/安全自评 | 已更新本地 | docs；历史PPT单独标记 |
-| Docker0.4与远端CI | 未验证 | 本机无Docker；本轮GitHub CI待执行 |
+| Docker0.4与远端CI | 通过 | [CI运行40113574011](https://github.com/ThreshoLdnnis/pact-v2/actions/runs/40113574011)，代码8860889；本机无Docker |
 | 浏览器人工/自动点击 | 未完成 | 2026-10-25再次初始化失败：failed to write kernel assets / 系统找不到指定的路径 |
 | 官方最终提交格式/模型使用规则 | 待团队核对 | 不将现有实现称为赛事官方验收通过 |
 
@@ -25,4 +25,4 @@
 
 完整交付包为PACT-V2-MVP-0.4.zip及同名manifest，包含源码、预构建工作台、文档、证据、Windows运行依赖及启动脚本，不包含真实密钥、.env、数据库、Git历史或开发环境。源码目录可单独开发；其他平台需在线准备依赖。
 
-后续验收入口：本机DeepSeek已通过scripts/check_model.py对应的两项候选联测，继续补充语义数据集；可用浏览器完成工作台点击验收；本轮上传后运行新CI、团队群同步接口并PR评审。以上没有代为发送或发布。
+后续验收入口：本机DeepSeek已通过scripts/check_model.py对应的两项候选联测，继续补充语义数据集；可用浏览器完成工作台点击验收；本轮新CI已通过；继续团队群同步接口并PR评审。以上没有代为发送或发布。

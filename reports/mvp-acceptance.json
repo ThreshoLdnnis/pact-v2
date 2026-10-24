@@ -55,9 +55,18 @@
   },
   "not_validated": [
     "browser interaction",
-    "Docker 0.4 runtime",
     "broad live model semantic evaluation",
-    "remote CI 0.4",
     "official submission format and final contest acceptance"
-  ]
+  ],
+  "github_ci": {
+    "status": "success",
+    "run_id": 40113574011,
+    "url": "https://github.com/ThreshoLdnnis/pact-v2/actions/runs/40113574011",
+    "validated_code_commit": "88608894e6b0901cb72d500c9bd06ddf7f814ed4",
+    "jobs": [
+      "test-and-build",
+      "docker-smoke"
+    ],
+    "repository_checks_run_id": 40113573990
+  }
 }
