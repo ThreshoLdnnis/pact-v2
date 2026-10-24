@@ -300,8 +300,11 @@ def test_cancellation_failure_does_not_release_commitment_or_refund(client, auth
     reserved = client.get(API + "/banking/accounts/acct-alice/commitments", headers=auth).json()["constraints"]["committed_cents"]
     p = run(client, auth, plan(client, auth, "取消视频会员"))
     approve(client, auth, p)
+    p = run(client, auth, p)
+    assert next(s for s in p["steps"] if s["status"] == "waiting_approval")["action"]["tool"] == "cancel_subscription"
+    approve(client, auth, p)
     monkeypatch.setattr(bank, "post_action", lambda *a: (_ for _ in ()).throw(DomainError("CANCEL_FAILED", "模拟明确取消失败")))
-    assert run(client, auth, p)["status"] == "failed"
+    assert run(client, auth, p)["status"] == "partially_completed"
     assert balance(client, auth) == before
     assert client.get(API + "/banking/accounts/acct-alice/commitments", headers=auth).json()["constraints"]["committed_cents"] == reserved
     with app.state.db.session() as s:
@@ -331,7 +334,7 @@ def test_cancellation_keeps_already_due_obligation_reserved(client, auth, app):
     with app.state.db.session(write=True) as s:
         s.add(Commitment(id="overdue", user_id="alice", account_id="acct-alice", name="已到期待核销扣款", amount_cents=5000, due_at=(now() - timedelta(days=1)).isoformat(), subscription_id="sub-video", kind="subscription"))
     p = finish(client, auth, plan(client, auth, "取消视频会员"))
-    assert p["steps"][0]["result"]["receipt"]["data"]["released_next_commitment_cents"] == 9800
+    assert next(s for s in p["steps"] if s["action"]["tool"] == "cancel_subscription")["result"]["receipt"]["data"]["released_next_commitment_cents"] == 9800
     with app.state.db.session() as s:
         assert s.get(Commitment, "overdue").status == "active"
 
@@ -363,7 +366,8 @@ def test_cancel_receipt_checks_actual_agreement_state(client, auth, app):
     p = finish(client, auth, plan(client, auth, "取消视频会员"))
     with app.state.db.session(write=True) as s:
         s.get(Subscription, "sub-video").active = True
-    assert client.get(API + f"/banking/receipts/{p['steps'][0]['receipt_id']}/verify", headers=auth).json()["verified"] is False
+    receipt_id = next(s for s in p["steps"] if s["action"]["tool"] == "cancel_subscription")["receipt_id"]
+    assert client.get(API + f"/banking/receipts/{receipt_id}/verify", headers=auth).json()["verified"] is False
     p = post(client, auth, p, "reconcile").json()
     assert p["status"] == "pending_verification"
     assert post(client, auth, p, "handoff", {"plan_version": p["version"], "reason": "协议状态不一致"}).json()["status"] == "handed_off"

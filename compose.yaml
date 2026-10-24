@@ -6,8 +6,15 @@ services:
     environment:
       PACT_DEMO_PIN: ${PACT_DEMO_PIN:-246810}
       PACT_DATABASE_URL: sqlite:///data/pact.db
+      PACT_MODEL_PROVIDER: ${PACT_MODEL_PROVIDER:-rules}
+      PACT_LLM_BASE_URL: ${PACT_LLM_BASE_URL:-}
+      PACT_LLM_MODEL: ${PACT_LLM_MODEL:-}
+      PACT_LLM_API_KEY: ${PACT_LLM_API_KEY:-}
+      PACT_LLM_FORMAT: ${PACT_LLM_FORMAT:-json_schema}
       PACT_OLLAMA_URL: ${PACT_OLLAMA_URL:-}
       PACT_OLLAMA_MODEL: ${PACT_OLLAMA_MODEL:-}
+      PACT_SANDBOX_CONTROLS: ${PACT_SANDBOX_CONTROLS:-0}
+      PACT_SANDBOX_ADMIN_TOKEN: ${PACT_SANDBOX_ADMIN_TOKEN:-}
     volumes:
       - pact-data:/app/data
     read_only: true

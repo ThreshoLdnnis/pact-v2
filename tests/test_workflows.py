@@ -61,8 +61,8 @@ def test_cross_scenario_dag_and_verified_receipts(client, auth):
     before = balance(client, auth)
     p = finish(client, auth, plan(client, auth, "分析本月账单，取消视频会员，再给张三转账500元，至少保留1000元"))
     assert p["status"] == "succeeded"
-    assert [s["action"]["tool"] for s in p["steps"]] == ["analyze_bills", "cancel_subscription", "transfer"]
-    assert [s["depends_on"] for s in p["steps"]] == [[], ["s1"], ["s2"]]
+    assert [s["action"]["tool"] for s in p["steps"]] == ["analyze_bills", "subscriptions", "cancel_subscription", "transfer"]
+    assert [s["depends_on"] for s in p["steps"]] == [[], [], ["query_1_s2"], ["s1", "s2"]]
     assert balance(client, auth) == before - 50000
     for step in p["steps"]:
         r = client.get(API + f"/banking/receipts/{step['receipt_id']}/verify", headers=auth)
@@ -218,7 +218,7 @@ def test_replan_preserves_completed_steps_and_invalidates_approvals(client, auth
     revised = r.json()
     assert revised["version"] == 2
     assert [s["receipt_id"] for s in revised["steps"] if s["status"] == "succeeded"] == retained
-    assert len(revised["steps"]) == 3
+    assert len(revised["steps"]) == 4
     assert finish(client, auth, revised)["status"] == "succeeded"
 
 
@@ -348,13 +348,14 @@ def test_completed_step_retry_during_partial_plan(client, auth):
 
 def test_rules_preserve_explicit_request_order(client, auth):
     p = plan(client, auth, "先给张三转账100元，再取消视频会员，然后分析账单")
-    assert [s["action"]["tool"] for s in p["steps"]] == ["transfer", "cancel_subscription", "analyze_bills"]
+    assert [s["action"]["tool"] for s in p["steps"]] == ["transfer", "subscriptions", "cancel_subscription", "analyze_bills"]
+    assert [s["depends_on"] for s in p["steps"]] == [[], ["s1"], ["query_1_s2"], ["s2"]]
 
 
 def test_repeated_cancellation_is_safe_noop(client, auth):
     assert finish(client, auth, plan(client, auth, "取消视频会员"))["status"] == "succeeded"
     p = finish(client, auth, plan(client, auth, "取消视频会员"))
-    result = p["steps"][0]["result"]["receipt"]["data"]
+    result = next(s for s in p["steps"] if s["action"]["tool"] == "cancel_subscription")["result"]["receipt"]["data"]
     assert p["status"] == "succeeded" and result["already_inactive"]
     assert result["released_next_commitment_cents"] == 0
 

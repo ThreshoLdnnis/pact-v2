@@ -1,0 +1,122 @@
+{
+  "version": "0.4",
+  "status": "passed",
+  "transport": "real_http",
+  "cases": [
+    {
+      "case": "parallel_prefix_then_verified_cancel_then_500_transfer",
+      "passed": true,
+      "approvals": [
+        "subscriptions",
+        "cancel_subscription",
+        "transfer"
+      ],
+      "balance_delta_cents": -50000,
+      "oracle": {
+        "passed": true,
+        "checks": 97,
+        "issues": [],
+        "counts": {
+          "accounts": 3,
+          "transactions": 6,
+          "receipts": 4,
+          "plans": 1,
+          "audit_events": 49
+        },
+        "source": "independent_sqlite_readonly_oracle",
+        "scope": "synthetic accounting, authorization, dependency evidence and audit invariants"
+      }
+    },
+    {
+      "case": "reset_revokes_history_and_402_becomes_500_after_cancel",
+      "passed": true,
+      "oracle": {
+        "passed": true,
+        "checks": 111,
+        "issues": [],
+        "counts": {
+          "accounts": 3,
+          "transactions": 7,
+          "receipts": 4,
+          "plans": 1,
+          "audit_events": 62
+        },
+        "source": "independent_sqlite_readonly_oracle",
+        "scope": "synthetic accounting, authorization, dependency evidence and audit invariants"
+      }
+    },
+    {
+      "case": "before_post_reject",
+      "passed": true,
+      "oracle": {
+        "passed": true,
+        "checks": 79,
+        "issues": [],
+        "counts": {
+          "accounts": 3,
+          "transactions": 5,
+          "receipts": 0,
+          "plans": 1,
+          "audit_events": 70
+        },
+        "source": "independent_sqlite_readonly_oracle",
+        "scope": "synthetic accounting, authorization, dependency evidence and audit invariants"
+      }
+    },
+    {
+      "case": "after_mutation_rollback",
+      "passed": true,
+      "oracle": {
+        "passed": true,
+        "checks": 87,
+        "issues": [],
+        "counts": {
+          "accounts": 3,
+          "transactions": 5,
+          "receipts": 0,
+          "plans": 1,
+          "audit_events": 78
+        },
+        "source": "independent_sqlite_readonly_oracle",
+        "scope": "synthetic accounting, authorization, dependency evidence and audit invariants"
+      }
+    },
+    {
+      "case": "verify_timeout",
+      "passed": true,
+      "oracle": {
+        "passed": true,
+        "checks": 110,
+        "issues": [],
+        "counts": {
+          "accounts": 3,
+          "transactions": 6,
+          "receipts": 1,
+          "plans": 1,
+          "audit_events": 88
+        },
+        "source": "independent_sqlite_readonly_oracle",
+        "scope": "synthetic accounting, authorization, dependency evidence and audit invariants"
+      }
+    },
+    {
+      "case": "cancel_failure_blocks_payment",
+      "passed": true,
+      "oracle": {
+        "passed": true,
+        "checks": 122,
+        "issues": [],
+        "counts": {
+          "accounts": 3,
+          "transactions": 5,
+          "receipts": 2,
+          "plans": 1,
+          "audit_events": 100
+        },
+        "source": "independent_sqlite_readonly_oracle",
+        "scope": "synthetic accounting, authorization, dependency evidence and audit invariants"
+      }
+    }
+  ],
+  "scope": "template composition, reset, faults and independent oracle; see context-http-smoke for request conflicts"
+}

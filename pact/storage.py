@@ -124,6 +124,63 @@ class Audit(Base):
     event_hash: Mapped[str] = mapped_column(String)
 
 
+class FaultRow(Base):
+    __tablename__ = "sandbox_faults"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String)
+    plan_id: Mapped[str] = mapped_column(String)
+    plan_version: Mapped[int] = mapped_column(Integer)
+    step_id: Mapped[str] = mapped_column(String)
+    point: Mapped[str] = mapped_column(String)
+    remaining: Mapped[int] = mapped_column(Integer, default=1)
+    expires_at: Mapped[str] = mapped_column(String)
+
+
+class ConflictRow(Base):
+    __tablename__ = "task_conflicts"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, index=True)
+    document: Mapped[dict] = mapped_column(JSON)
+
+
+class PreferenceRow(Base):
+    __tablename__ = "intent_preferences"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, index=True)
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"))
+    subscription_id: Mapped[str] = mapped_column(ForeignKey("subscriptions.id"))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[str] = mapped_column(String, default=stamp)
+    __table_args__ = (UniqueConstraint("user_id", "subscription_id"),)
+
+
+class ConversationRow(Base):
+    __tablename__ = "conversations"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, index=True)
+    document: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class TurnRow(Base):
+    __tablename__ = "conversation_turns"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, index=True)
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id"))
+    request_id: Mapped[str] = mapped_column(String)
+    input_hash: Mapped[str] = mapped_column(String)
+    response: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[str] = mapped_column(String, default=stamp)
+    __table_args__ = (UniqueConstraint("user_id", "request_id"),)
+
+
+class ClarificationRow(Base):
+    __tablename__ = "conversation_clarifications"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, index=True)
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id"))
+    document: Mapped[dict] = mapped_column(JSON)
+
+
 class Database:
     def __init__(self, url):
         if not url.startswith("sqlite:///") or url.endswith(":memory:"):
@@ -141,7 +198,7 @@ class Database:
 
     @contextmanager
     def session(self, write=False):
-        with Session(self.engine, expire_on_commit=False) as session:
+        with Session(self.engine, expire_on_commit=False, info={"sandbox_controls_enabled": getattr(self, "sandbox_controls_enabled", False)}) as session:
             try:
                 session.execute(text("BEGIN IMMEDIATE" if write else "BEGIN"))
                 yield session

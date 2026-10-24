@@ -1,6 +1,6 @@
 # 答辩文件
 
-版本提示：现有PPT与讲稿是0.1交付快照，其中41项测试与界面图片对应旧版本。0.2核心业务改动及最新测试以docs/BUSINESS_DAGS.md、docs/SECURITY_SELF_ASSESSMENT.md和reports/tests.xml为准，本次没有重制答辩材料。
+版本提示：现有PPT与讲稿是0.1交付快照，其中41项测试与界面图片对应旧版本。0.4当前演示讲稿已更新为docs/DEFENSE.md，验收以docs/MVP_ACCEPTANCE.md、docs/SECURITY_SELF_ASSESSMENT.md和reports/tests.xml为准。本轮未重制历史PPT，不应直接用于当前答辩。
 
 PACT-Defense.pptx为8页可编辑答辩材料，配套讲稿位于docs/DEFENSE.md。
 

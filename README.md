@@ -2,102 +2,68 @@
 
 Proactive Agent for Commitments & Transactions
 
-可运行的银行 Agent 沙箱 MVP。支持智能转账、账单分析、订阅/代扣管理和跨场景 DAG，使用合成账户，不连接真实银行。
-
-当前为**0.2核心业务完善版**。新增订阅查询黄色授权、同名收款人选择、结果待核验、部分完成和人工接管。既有跨场景执行顺序和依赖保持原样，跨DAG冲突协调等待讨论确认。业务流程及攻防边界见[BUSINESS_DAGS.md](docs/BUSINESS_DAGS.md)。
-
-优先体验三个单场景：“查询订阅”（确认后显示快照，可再申请取消）、“给王五转账100元”（两名同名对象需先选择）、“分析本月账单”（真实流水统计与来源编号）。人工接管按钮会冻结自动执行并使旧审批失效；交还后重新授权。待核验通过“查询原交易核验结果”处理，不提供重复付款按钮。
+当前为 **0.4 本地验收版**。智能转账、账单分析、订阅/代扣管理复用业务 DAG 模板，完成组合执行、用户冲突选择、上下文更正、审批与回执闭环。仅使用合成账户，不连接真实银行。2026-10-25用户已授权整理GitHub，本轮通过feat/pact-mvp与草稿PR #8提交评审；不自动合并main或冻结共享接口。
 
 ## 立即运行
 
-**Windows 部署包**：解压后双击 `start-pact.cmd`。首次运行自动创建项目内 Python 环境、安装锁定依赖。部署包包含已构建前端，无需 Node。需要 Python 3.12+，或本机已有的 Codex Python 运行时。首次安装依赖需要网络。
+解压 `PACT-V2-MVP-0.4.zip`，Windows 双击 `start-pact.cmd`，访问 **http://127.0.0.1:8000**，选择 Alice，演示 PIN **246810**。
 
-浏览器访问 **http://127.0.0.1:8000**，选择 Alice，默认演示 PIN **246810**。
+部署包含已构建工作台与 Windows x64 / CPython 3.12 的离线依赖；该环境首次安装无需联网、Node 或 Codex。需要本机安装 Python 3.12。Python 其他版本（3.12以上）、Linux/macOS 使用锁定 requirements.txt 在线安装，随后可运行 `sh start-pact.sh`。本轮实际完成 Windows 干净目录、独立环境、断网安装、HTTP 与重启验收，详见 [验收清单](docs/MVP_ACCEPTANCE.md)。
 
-**Docker Compose**（需要已安装 Docker）：
+也支持 `docker compose up --build -d`。本机无 Docker，0.4 容器运行尚未验证；历史 CI 不能替代本版验收。
 
-```bash
-docker compose up --build -d
-# 工作台 http://127.0.0.1:8000
-# API 文档 http://127.0.0.1:8000/docs
-# 停止并保留合成数据
-docker compose down
-```
+## 六分钟演示
 
-**源码开发**（Python 3.12+，Node 24+）：
+1. 输入“分析账单、取消视频会员、再给张三转账500元”。展示四个执行节点：账单分析，与订阅查询→取消；转账等待账单和取消核验。分别确认黄色查询、取消与付款。
+2. 查看后端核验回执和实际余额变化。1001元或日累计超过1000元需模拟强验证；界面明确标记其为模拟。
+3. 新会话输入“给王五转账100元”：同名收款人先选择，选择不等于付款授权。
+4. 新会话输入“给张三转账500元”，再输入“那个改成300”：修改同一任务版本，旧授权失效。若另有最低留存金额或多个目标，先选择具体字段/任务。
+5. 输入“分析账单、取消视频会员、再给张三转账500元”，随后“算了，留着吧”：停止未执行取消，暂停依赖它的付款；已核验动作保留。
+6. 独立验收环境用 tight_budget 场景演示两个300元请求竞争402元可用金额：两项等待用户选择，允许选择后来的请求，选中后仍重新确认，不自动付款。
 
-```bash
-python -m venv .venv
-# Windows 使用 .venv\Scripts\python.exe，其他平台使用 .venv/bin/python
-.venv/bin/python -m pip install -r requirements-dev.txt
-cd apps/workbench
-npm ci
-npm run build
-cd ../..
-.venv/bin/python -m uvicorn pact.app:create_app --factory --host 127.0.0.1 --port 8000
-```
+每段演示应使用独立新场景或先明确重置合成数据，避免上段已经取消的会员、已入账付款影响预期。管理员重置默认关闭，见 [沙箱测试](docs/SANDBOX_TESTING.md)。完整讲稿见 [答辩材料](docs/DEFENSE.md)。
 
-也可以运行 `python scripts/bootstrap.py` 自动准备项目。开发前端可在另一个终端运行 `npm run dev`，5173 会将 API 请求代理到 8000。
+## 模型配置
 
-## 三分钟演示
+默认 `rules` 为有限语法演示解析器。支持 **OpenAI-compatible Chat Completions** 外部服务及 Ollama。将 `.env.example` 复制为本机 `.env`，填写服务地址、模型标识和密钥后重启；不要将密钥发到聊天或提交仓库。示例密钥为空，部署包不收录 `.env`。配置方法和非执行联测见 [模型接入](docs/MODEL_PROVIDERS.md)。
 
-1. 输入：**分析本月账单，取消视频会员，再给张三转账500元，至少保留1000元**。
-2. 账单分析自动完成。确认取消视频会员，再确认转账；每个授权只绑定当前步骤和参数。
-3. 点击步骤下的回执，查看 `verified: true` 与真实模拟交易引用。
-4. 新建“给张三转账1001元”，申请模拟验证码，手动填写后继续。强验证明确标为演示。
-5. 打开“资金承诺”，查看房租、下次订阅扣款对可用金额的影响。
-6. 演示失败重规划：请求“分析账单，给张三转账99999元”，强验证后触发资金约束失败，再以“分析账单，给张三转账50元”重规划。已核验账单步骤保留。
+外部模型只生成闭合 CandidatePlan；后端重新解析字段、编译模板、校验归属、权限和资金。配置错误、拒答、截断或不合规响应停住，显式选择模型后不会静默回退到规则。本机已接入DeepSeek并通过两项真实候选生成联测，证据为reports/deepseek-live-candidates.json；尚未完成广泛语义质量评测。受控响应测试不代表模型实际理解能力。
 
-默认规划器是有限语法的规则演示器。可选本地 Ollama 适配器使用 JSON Schema 生成候选，再由相同后端严格校验。真实模型推理尚未在本环境连测，不能把规则演示的结果当作模型能力评测。
+## 执行边界
 
-## 已实现的执行边界
+- 四对象 TaskPlan / TaskStep / ApprovalRequest / ExecutionReceipt 和 Banking Tool API 从 Pydantic 导出 JSON Schema、OpenAPI 与 TypeScript。
+- 订阅查询及取消均黄色；一般只读绿色。转出上海自然日累计含本笔≤1000元黄色，>1000元红色模拟强验证。未实现的退款、挂失等工具拒绝。
+- 银行写事务重查授权、余额、最低留存、未来承诺、日累计；双边分录、授权消费和规范回执原子提交，步骤幂等身份唯一。
+- 交易结果待核验时冻结后续执行，只查询原交易，不重复付款；部分完成与人工接管保留事实。
+- 多请求争用资金或保留/取消矛盾时由用户选择，无先来先到优先。意图协调不等于银行冻结资金；真正付款仍原子校验。
+- 中断在当前事务结束后生效；不伪造退款或恢复已取消会员。可撤销尚未付款的定时安排，原登记回执保留。
+- “帮我省点钱”仅分析与建议，不默认取消会员或转账。
 
-- Pydantic 是协议唯一来源，导出 JSON Schema、OpenAPI 与前端 TypeScript 类型。
-- 独立 Policy Engine 决定绿/黄/红，模型不能提供风险等级、审批状态或交易结果。
-- 一般只读自动，订阅协议查询与取消均需确认；用户上海自然日转出累计含本笔 ≤1000 元需确认；>1000 元需模拟强验证。未实现的挂失、退款等工具拒绝执行。
-- 后端在同一个 SQLite 写事务中重新校验审批绑定、日累计、最低留存和未来承诺，完成双边分录、余额更新、审批消费及回执保存。
-- 幂等键和步骤执行身份均唯一。同键异参/改版本拒绝，重复请求复用已核验回执。
-- 计划、审批、回执与会话持久化。暂停/恢复和重规划保留已完成步骤，旧审批失效。
-- 定时转账先预留承诺并返回 `scheduled`，每 15 秒检查到期并生成新审批任务，到期重新授权后付款。
-- 连续 3 次执行异常触发 60 秒熔断。审计哈希链、账户对账与回执查询提供核验入口。
+## 开发与验证
 
-## 目录与协议
-
-| 路径 | 内容 |
-| --- | --- |
-| `services/agent/` | 候选规划、DAG、暂停恢复、重规划 |
-| `services/banking/` | 合成银行数据、账务、幂等、回执 |
-| `services/policy/` | 三级决策与资金约束纯逻辑 |
-| `pact/` | API、身份演示、持久化与审计 |
-| `contracts/` | Python 模型、生成的 JSON Schema/OpenAPI |
-| `apps/workbench/` | React/TypeScript 工作台 |
-| `tests/` | 端到端、并发和安全场景 |
-| `reports/` | 实际测试、扫描、HTTP 验收与界面证据 |
-
-- [技术架构](docs/ARCHITECTURE.md)
-- [API 与协议](docs/API.md)
-- [状态流转](docs/STATE_MACHINE.md)
-- [部署与恢复](docs/DEPLOYMENT.md)
-- [安全自评报告](docs/SECURITY_SELF_ASSESSMENT.md)
-- [答辩讲稿与演示顺序](docs/DEFENSE.md)
-- [接口变更与群同步模板](docs/INTERFACE_CHANGES.md)
-
-## 验证
+Python 3.12+、源码前端 Node 24+。运行 `python scripts/bootstrap.py` 准备环境；开发测试另装 `requirements-dev.txt`。
 
 ```bash
 python -m pytest --junitxml=reports/tests.xml
 python scripts/export_contracts.py
 cd apps/workbench
+npm ci
 npm run build
-npm audit
 ```
 
-实际验证结果和未验证项见安全自评。扫描零已知漏洞仅表示此次查询结果，不是安全认证。
+当前 **158项测试通过**，前端编译构建通过；独立解压部署完成1组主流程、4组业务、6组沙箱、9组上下文/冲突 HTTP 场景及重启恢复，参见 `reports/independent-deployment.json`。浏览器自动化仍因工具初始化故障未完成，不能把构建与HTTP通过称为界面点击验收。
 
-## 使用限制
+## 文档与目录
 
-此版本是本地单进程模块化 MVP。演示 PIN/身份切换不是生产登录，模拟验证码不是真实 MFA，审计链没有外部防篡改锚点。仅面向合成数据和本机/容器内演示。[CI](https://github.com/ThreshoLdnnis/pact-v2/actions/runs/40069404218) 已通过Docker构建、Compose启动与真实HTTP烟测，本机没有Docker。不要将服务公开部署或接入真实金融数据。
+| 路径 | 内容 |
+| --- | --- |
+| services/agent | 模型候选、模板、上下文、冲突、编排 |
+| services/banking | 合成账户、原子账务、幂等与回执 |
+| services/policy | 独立权限和资金约束逻辑 |
+| services/sandbox | 管理员重置、故障注入、独立只读验收器 |
+| contracts / apps/workbench | 共享协议 / React工作台 |
+| tests / reports | 自动化测试 / 实际验证证据 |
 
-金额统一使用整数分，自然日采用 Asia/Shanghai，存储时间采用带时区 UTC ISO 8601。共享接口版本为 0.2 评审实现，尚未完成团队群同步与协议冻结，不宣称已通过赛事验收。
+[业务DAG](docs/BUSINESS_DAGS.md) · [跨请求与中断](docs/CONTEXT_COORDINATION.md) · [API](docs/API.md) · [架构](docs/ARCHITECTURE.md) · [状态](docs/STATE_MACHINE.md) · [部署](docs/DEPLOYMENT.md) · [安全自评](docs/SECURITY_SELF_ASSESSMENT.md) · [接口变更模板](docs/INTERFACE_CHANGES.md)
 
-团队交付目标为 2026-11-02，来源于用户要求。赛事规则与提交格式仍需对照团队取得的官方文件核验。未选择开源许可证。
+此项目是单进程、SQLite、小规模合成演示沙箱，演示PIN、模拟强验证和本地审计链不代表银行生产认证、核心账务或合规认证。交付目标2026-11-02来自团队要求，最终赛事格式、模型使用和提交规则仍需对照官方文件确认。共享接口需按团队群同步与PR评审流程冻结，当前通过草稿PR评审，尚未合并main。

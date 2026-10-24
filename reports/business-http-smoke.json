@@ -1,6 +1,6 @@
 {
   "status": "passed",
-  "version": "0.2",
+  "version": "0.4",
   "cases": [
     "yellow_subscription_query_and_snapshot",
     "same_name_selection_then_separate_approval",

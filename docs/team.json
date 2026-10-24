@@ -1,9 +1,35 @@
 {
-  "updated_on": "2026-10-24",
+  "updated_on": "2026-10-25",
   "roles": {
-    "A": {"name": "仓库所有者", "github": "ThreshoLdnnis", "paths": ["services/agent/"]},
-    "B": {"name": "杨曦", "github": "Clement-xi", "paths": ["services/banking/"]},
-    "C": {"name": "郭宇哲", "github": "morebadly", "paths": ["services/policy/", "tests/security/"]},
-    "D": {"name": "吴晓亦", "github": null, "paths": ["apps/workbench/", "infra/"]}
+    "A": {
+      "name": "仓库所有者",
+      "github": "ThreshoLdnnis",
+      "paths": [
+        "services/agent/"
+      ]
+    },
+    "B": {
+      "name": "杨曦",
+      "github": "Clement-xi",
+      "paths": [
+        "services/banking/"
+      ]
+    },
+    "C": {
+      "name": "郭宇哲",
+      "github": "morebadly",
+      "paths": [
+        "services/policy/",
+        "tests/security/"
+      ]
+    },
+    "D": {
+      "name": "吴晓亦",
+      "github": null,
+      "paths": [
+        "apps/workbench/",
+        "infra/"
+      ]
+    }
   }
 }

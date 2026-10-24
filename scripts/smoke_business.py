@@ -74,6 +74,6 @@ p = finish(p)
 assert p["status"] == "partially_completed" and p["progress"]["completed"] == 1 and p["progress"]["failed"] == 1
 assert call("/banking/accounts")["items"][0]["balance_cents"] == initial - 30000
 assert call("/banking/reconciliation")["balanced"]
-result = {"status": "passed", "version": "0.2", "cases": ["yellow_subscription_query_and_snapshot", "same_name_selection_then_separate_approval", "handoff_blocks_resume_and_requires_new_approval", "partial_completion_preserves_payment"], "balance_delta_cents": -30000, "balanced": True}
+result = {"status": "passed", "version": "0.4", "cases": ["yellow_subscription_query_and_snapshot", "same_name_selection_then_separate_approval", "handoff_blocks_resume_and_requires_new_approval", "partial_completion_preserves_payment"], "balance_delta_cents": -30000, "balanced": True}
 Path("reports/business-http-smoke.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
 print(json.dumps(result))

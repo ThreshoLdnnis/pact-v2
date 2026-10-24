@@ -7,6 +7,7 @@ from pact.app import create_app
 def app(tmp_path, monkeypatch):
     monkeypatch.delenv("PACT_OLLAMA_URL", raising=False)
     monkeypatch.delenv("PACT_OLLAMA_MODEL", raising=False)
+    monkeypatch.setenv("PACT_MODEL_PROVIDER", "")
     monkeypatch.setenv("PACT_DEMO_PIN", "246810")
     return create_app("sqlite:///" + (tmp_path / "pact.db").as_posix(), scheduler=False)
 

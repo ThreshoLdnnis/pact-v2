@@ -1,10 +1,12 @@
-# Only verified repository owners are active until collaborator invitations are accepted.
-# Last matching rule wins. Replace pending comments with active rules after access is verified.
+# Write permissions for A/B/C verified through GitHub on 2026-10-25.
+# Last matching rule wins. D remains pending a GitHub username.
 * @ThreshoLdnnis
 /.github/ @ThreshoLdnnis
 /services/agent/ @ThreshoLdnnis
-# B pending accepted invitation: /services/banking/ @Clement-xi
-# C pending accepted invitation: /services/policy/ @morebadly
-# C pending accepted invitation: /tests/security/ @morebadly
+/services/banking/ @Clement-xi @morebadly
+/services/policy/ @morebadly
+/services/sandbox/ @Clement-xi @morebadly
+/tests/ @ThreshoLdnnis @morebadly
+/contracts/ @ThreshoLdnnis @Clement-xi @morebadly
 # D pending GitHub username: /apps/workbench/ and /infra/
-# Shared contracts: A/B/C/D review required by team process; add valid owners after onboarding.
+# Shared contracts still require the team review process; CODEOWNERS is not group approval.

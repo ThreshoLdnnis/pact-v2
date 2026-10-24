@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 Money = Annotated[StrictInt, Field(ge=1, le=100_000_000)]
 Identifier = Annotated[str, Field(pattern=r"^[a-zA-Z0-9_-]{1,80}$")]
-State = Literal["planned", "waiting_approval", "waiting_clarification", "executing", "pending_verification", "partially_completed", "handed_off", "succeeded", "failed", "paused"]
+State = Literal["planned", "waiting_approval", "waiting_clarification", "waiting_conflict", "executing", "pending_verification", "partially_completed", "handed_off", "succeeded", "failed", "paused", "cancelled"]
 
 
 class Closed(BaseModel):
@@ -114,9 +114,24 @@ class PlanProgress(Closed):
     failed: int = 0
     pending_verification: int = 0
     remaining: int = 0
+    cancelled: int = 0
+
+
+class InterruptionReview(Closed):
+    reason: str
+    created_at: str
+    cancelled_step_ids: list[str] = Field(default_factory=list)
+    blocked_step_ids: list[str] = Field(default_factory=list)
+    retained_receipt_ids: list[str] = Field(default_factory=list)
+    unknown_receipt_ids: list[str] = Field(default_factory=list)
+    compensation_items: list[dict] = Field(default_factory=list)
+    message: str
 
 
 class TaskStep(CandidateStep):
+    template_id: str | None = None
+    template_instance_id: str | None = None
+    template_version: int | None = None
     status: State = "planned"
     risk_level: Literal["green", "yellow", "red"] | None = None
     approval_id: str | None = None
@@ -127,17 +142,94 @@ class TaskStep(CandidateStep):
 
 
 class TaskPlan(Closed):
-    schema_version: Literal["0.1", "0.2"] = "0.2"
+    schema_version: Literal["0.1", "0.2", "0.3", "0.4"] = "0.4"
     plan_id: str
     version: int = 1
     title: str
-    planner: Literal["rules", "ollama", "structured", "schedule"]
+    planner: Literal["rules", "ollama", "openai_compatible", "structured", "schedule"]
     minimum_balance_cents: int = 0
     status: State = "planned"
     steps: list[TaskStep]
     created_at: str
     progress: PlanProgress = Field(default_factory=PlanProgress)
     handoff: HandoffRecord | None = None
+    ready_step_ids: list[str] = Field(default_factory=list)
+    activated_until: str | None = None
+    conflict_ids: list[str] = Field(default_factory=list)
+    interruption: InterruptionReview | None = None
+
+
+class InterruptInput(Closed):
+    plan_version: Annotated[StrictInt, Field(ge=1)]
+    reason: str = Field(min_length=1, max_length=500)
+    step_id: Identifier | None = None
+
+
+class ConflictDecision(Closed):
+    choice: Literal["execute_plan", "keep_subscription", "pause_all"]
+    selected_plan_id: Identifier | None = None
+
+    @model_validator(mode="after")
+    def selection(self):
+        if (self.choice == "execute_plan") != (self.selected_plan_id is not None):
+            raise ValueError("execute_plan requires exactly one selected_plan_id")
+        return self
+
+
+class ConversationInput(Closed):
+    request_id: Identifier
+    message: str = Field(min_length=1, max_length=2000)
+    conversation_id: Identifier | None = None
+    focus_plan_id: Identifier | None = None
+    focus_plan_version: Annotated[StrictInt, Field(ge=1)] | None = None
+    focus_step_id: Identifier | None = None
+    focus_field: Literal["amount_cents", "minimum_balance_cents"] | None = None
+
+
+class ClarificationDecision(Closed):
+    option_id: Identifier
+
+
+class ConversationResponse(Closed):
+    conversation_id: str
+    turn_id: str
+    outcome: Literal["planned", "amended", "clarification", "interrupted", "reused", "informational"]
+    message: str
+    plan: TaskPlan | None = None
+    clarification: dict | None = None
+    recommendations: list[str] = Field(default_factory=list)
+
+
+class TemplateInstance(Closed):
+    instance_id: Identifier
+    template_id: Literal["bill_analysis", "subscription_management", "smart_transfer"]
+    action: Action
+    depends_on: list[Identifier] = Field(default_factory=list, max_length=12)
+
+    @model_validator(mode="after")
+    def compatible_action(self):
+        allowed = {"bill_analysis": {"analyze_bills"}, "subscription_management": {"subscriptions", "cancel_subscription"}, "smart_transfer": {"transfer", "schedule_transfer"}}
+        if self.action.tool not in allowed[self.template_id]:
+            raise ValueError("action does not belong to the selected template")
+        return self
+
+
+class CompositionInput(Closed):
+    title: str = Field(min_length=1, max_length=120)
+    minimum_balance_cents: Annotated[StrictInt, Field(ge=0, le=100_000_000)] = 0
+    instances: list[TemplateInstance] = Field(min_length=1, max_length=6)
+
+
+class SandboxReset(Closed):
+    confirmation: Literal["RESET_SYNTHETIC_DATA"]
+    scenario: Literal["baseline", "tight_budget"] = "baseline"
+
+
+class FaultInput(Closed):
+    plan_id: Identifier
+    plan_version: Annotated[StrictInt, Field(ge=1)]
+    step_id: Identifier
+    point: Literal["before_post_reject", "after_mutation_rollback", "verify_timeout"]
 
 
 class ApprovalRequest(Closed):

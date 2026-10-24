@@ -1,10 +1,12 @@
-# PACT 协议 0.2 与 API
+当前协议0.4，本轮在本地实现，尚未团队群同步冻结；本轮提交草稿PR #8评审。完整精确字段以contracts/openapi.json和task-protocol.schema.json为准。
+
+# PACT 协议 0.4 与 API
 
 状态：可运行的评审实现，尚未群同步/冻结。代码唯一来源为 contracts/models.py。运行 python scripts/export_contracts.py 生成完整 OpenAPI、Banking Tool OpenAPI、Task Protocol JSON Schema 和前端 protocol.ts。
 
 ## 通用规则
 
-- 基础路径 /api/v1，除 /auth/demo-session、/meta、/health 外均需 Authorization: Bearer <演示会话令牌>。
+- 基础路径 /api/v1，业务接口需 Authorization: Bearer <演示会话令牌>；/auth/demo-session、/meta、/health为公开演示入口；/sandbox/*需要独立X-Sandbox-Admin，不接受普通会话替代。
 - 金额 amount_cents/minimum_balance_cents 为整数分，拒绝浮点/负数/布尔金额。币种 CNY。
 - 存储时间为带时区 UTC ISO 8601；日累计按 Asia/Shanghai 自然日，按用户所有账户成功转出汇总，包含本次拟转金额。
 - 只接受白名单工具和闭合字段。模型无权设置风险等级、审批状态、执行状态或结果。
@@ -24,6 +26,23 @@ Task Protocol 负责候选、DAG 与状态。Banking Tool Protocol 负责规范�
 | ExecutionReceipt | receipt_id, plan_id, plan_version, step_id, action_hash, operation, status, transaction_id, data, created_at | Banking 后端 |
 | BankingCommand | plan_id, plan_version, step_id, idempotency_key, action | 调用方提交，后端与已保存步骤逐字段比对 |
 
+0.3增加TaskStep的template_id、template_instance_id、template_version（仅服务端生成），以及TaskPlan.ready_step_ids（依赖满足的节点，不表示已经授权）。CandidatePlan仍拒绝运行字段和安全字段。取消动作会自动补齐查询节点，因此步骤数量和确认次数与0.2不同。
+
+组合接口示例：两个独立前置业务、转账等待二者核验。每个instance的step_id也是该业务模板的出口；内部查询节点由服务端补齐，不由调用方删除。
+
+```json
+{
+  "title": "分析账单、取消视频会员、再给张三转账500元",
+  "instances": [
+    {"instance_id": "bills", "template_id": "bill_analysis", "action": {"tool": "analyze_bills", "account_id": "acct-alice"}},
+    {"instance_id": "membership", "template_id": "subscription_management", "action": {"tool": "cancel_subscription", "account_id": "acct-alice", "subscription_id": "sub-video"}},
+    {"instance_id": "payment", "template_id": "smart_transfer", "depends_on": ["bills", "membership"], "action": {"tool": "transfer", "account_id": "acct-alice", "recipient_query": "张三", "amount_cents": 50000}}
+  ]
+}
+```
+
+测试管理API见[SANDBOX_TESTING.md](SANDBOX_TESTING.md)。它们不属于Banking Tool API，不得交给模型。审批scope_hash自0.3开始同时绑定depends_on；旧未消费授权在执行时按新绑定检查，不会自动继承。
+
 ## 路由目录
 
 | 方法 | 路径 | 请求/结果 |
@@ -32,6 +51,8 @@ Task Protocol 负责候选、DAG 与状态。Banking Tool Protocol 负责规范�
 | POST | /auth/logout | 撤销当前会话 |
 | POST | /agent/plans | {message}；生成 TaskPlan，不自动付款 |
 | POST | /agent/candidates | 严格 CandidatePlan；校验 DAG、资源归属后保存 |
+| GET | /agent/templates | 三个业务模板、版本、强制关口 |
+| POST | /agent/compositions | CompositionInput；校验模板类型、别名依赖并展开成TaskPlan |
 | GET | /agent/plans | 当前用户计划列表 |
 | GET | /agent/plans/{id} | 当前持久化 TaskPlan |
 | POST | /agent/plans/{id}/run | 执行到完成、失败或待授权，返回 TaskPlan |
@@ -76,10 +97,28 @@ transfer 为 {tool,account_id,recipient_id或recipient_query,amount_cents,commit
 
 ## 0.2行为变化与兼容
 
-- 新写入TaskPlan.schema_version=0.2；读取接受0.1历史计划。TaskPlan增加progress及handoff；TaskStep增加clarification；ApprovalRequest增加scope_hash，绑定主体、版本、步骤、动作和最低留存。旧缺失scope_hash的审批需重新发起，不能沿用。
+- 0.2时新写入TaskPlan.schema_version=0.2；读取接受0.1历史计划。TaskPlan增加progress及handoff；TaskStep增加clarification；ApprovalRequest增加scope_hash，绑定主体、版本、步骤、动作和最低留存。旧缺失scope_hash的审批需重新发起，不能沿用。
 - GET /banking/accounts/{id}/subscriptions未提供receipt_id时403。提供本人/本账户、确有已消费黄色确认的查询回执时，只返回原查询快照（source_receipt_id、snapshot_at），不返回实时数据。新的查询仍走subscriptions候选→确认→执行。旧绿色回执、其他工具回执不适用。
 - 绿色commitments接口隐藏单项订阅协议详情，增加subscription_reserved_cents；commitment-graph仅显示合计节点。银行内部约束仍包含完整预留。取消仅释放未到期承诺，不作历史退款。
 - 账单结果增加transaction_ids和anomalies；当前非转账消费≥3000元只是待核查提示。
 - 新状态waiting_clarification、pending_verification、partially_completed、handed_off见STATE_MACHINE.md。执行响应receipt=null也可能表示待澄清/待核验，请检查plan.status。
 - 此前客户端需更新枚举、订阅读取和人工处理交互；/api/v1路径保留不等于冻结的0.1客户端完全兼容。生成协议与工作台已一起更新，尚未完成团队群确认。
 - 本次未改变跨场景动作顺序、依赖或跨DAG冲突调度。明确的新业务边界见BUSINESS_DAGS.md。
+
+## 0.4消息、冲突与中断
+
+所有路径均以/api/v1为前缀、使用本人Bearer会话，错误{error:{code,message,details?}}。
+
+| 方法/路径 | 请求及语义 |
+| --- | --- |
+| POST /agent/messages | ConversationInput：request_id、message；可选conversation_id、focus_plan_id/version、focus_step_id、focus_field。返回ConversationResponse（outcome/message/plan/clarification/recommendations）。同编号同输入复用，异参409 |
+| GET /agent/conversations/{id} | 本人持久化turns（最多100）、clarifications和关联plan_ids |
+| POST /agent/clarifications/{id}/decision | {option_id}；本人/版本/10分钟有效期绑定，不能提交自由执行参数 |
+| GET /agent/conflicts | 本人冲突列表items，open项需选择 |
+| POST /agent/conflicts/{id}/decision | {choice:execute_plan,selected_plan_id}或{choice:keep_subscription/pause_all}；不执行业务 |
+| GET /agent/intent-preferences | 本人明确保留意图，无实时订阅金额或协议快照 |
+| POST /agent/plans/{id}/interrupt | {plan_version,reason,step_id?}；停止未执行部分，返回含interruption的TaskPlan |
+
+TaskPlan.schema_version=0.4，读取兼容0.1/0.2/0.3；新增waiting_conflict、cancelled，progress.cancelled，conflict_ids、activated_until及InterruptionReview。planner增加openai_compatible。运行元数据全部由服务端写入，CandidatePlan不接受这些字段。更正产生新版本；停止依赖后需重规划，不能用resume复活。
+
+同一个/agent/messages响应只表达该消息处理结果，后续任务变化应GET最新计划；重放旧消息不代表返回的是实时任务状态。/banking/execute与/run使用同一协调与授权边界，不能换入口绕过冲突。

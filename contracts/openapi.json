@@ -3,7 +3,7 @@
   "info": {
     "title": "PACT V2.0 Sandbox",
     "description": "仅合成数据的银行 Agent MVP。候选计划与银行工具 API 分离；模型不具备执行权限。",
-    "version": "0.2.0"
+    "version": "0.4.0"
   },
   "paths": {
     "/health": {
@@ -38,6 +38,190 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sandbox/reset": {
+      "post": {
+        "tags": [
+          "Sandbox controls"
+        ],
+        "summary": "Reset Sandbox",
+        "operationId": "reset_sandbox_api_v1_sandbox_reset_post",
+        "parameters": [
+          {
+            "name": "x-sandbox-admin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "X-Sandbox-Admin"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SandboxReset"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sandbox/faults": {
+      "post": {
+        "tags": [
+          "Sandbox controls"
+        ],
+        "summary": "Inject Fault",
+        "operationId": "inject_fault_api_v1_sandbox_faults_post",
+        "parameters": [
+          {
+            "name": "x-sandbox-admin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "X-Sandbox-Admin"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FaultInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sandbox/faults/clear": {
+      "post": {
+        "tags": [
+          "Sandbox controls"
+        ],
+        "summary": "Clear Faults",
+        "operationId": "clear_faults_api_v1_sandbox_faults_clear_post",
+        "parameters": [
+          {
+            "name": "x-sandbox-admin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "X-Sandbox-Admin"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sandbox/acceptance": {
+      "get": {
+        "tags": [
+          "Sandbox controls"
+        ],
+        "summary": "Independent Acceptance",
+        "operationId": "independent_acceptance_api_v1_sandbox_acceptance_get",
+        "parameters": [
+          {
+            "name": "x-sandbox-admin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "X-Sandbox-Admin"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -175,6 +359,257 @@
         ]
       }
     },
+    "/api/v1/agent/messages": {
+      "post": {
+        "tags": [
+          "Conversation"
+        ],
+        "summary": "Message",
+        "operationId": "message_api_v1_agent_messages_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agent/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "Conversation"
+        ],
+        "summary": "Conversation Detail",
+        "operationId": "conversation_detail_api_v1_agent_conversations__conversation_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/clarifications/{clarification_id}/decision": {
+      "post": {
+        "tags": [
+          "Conversation"
+        ],
+        "summary": "Clarification Decision",
+        "operationId": "clarification_decision_api_v1_agent_clarifications__clarification_id__decision_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "clarification_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Clarification Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClarificationDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/conflicts": {
+      "get": {
+        "tags": [
+          "Coordination"
+        ],
+        "summary": "Conflicts",
+        "operationId": "conflicts_api_v1_agent_conflicts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agent/conflicts/{conflict_id}/decision": {
+      "post": {
+        "tags": [
+          "Coordination"
+        ],
+        "summary": "Conflict Decision",
+        "operationId": "conflict_decision_api_v1_agent_conflicts__conflict_id__decision_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conflict_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conflict Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConflictDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/intent-preferences": {
+      "get": {
+        "tags": [
+          "Coordination"
+        ],
+        "summary": "Intent Preferences",
+        "operationId": "intent_preferences_api_v1_agent_intent_preferences_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/agent/candidates": {
       "post": {
         "tags": [
@@ -187,6 +622,76 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CandidatePlan"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskPlan"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agent/templates": {
+      "get": {
+        "tags": [
+          "Agent Task Protocol"
+        ],
+        "summary": "Template Catalog",
+        "operationId": "template_catalog_api_v1_agent_templates_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agent/compositions": {
+      "post": {
+        "tags": [
+          "Agent Task Protocol"
+        ],
+        "summary": "Composition",
+        "operationId": "composition_api_v1_agent_compositions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompositionInput"
               }
             }
           },
@@ -385,6 +890,63 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskPlan"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/plans/{plan_id}/interrupt": {
+      "post": {
+        "tags": [
+          "Agent Task Protocol"
+        ],
+        "summary": "Interrupt",
+        "operationId": "interrupt_api_v1_agent_plans__plan_id__interrupt_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterruptInput"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1611,6 +2173,21 @@
         ],
         "title": "CandidateStep"
       },
+      "ClarificationDecision": {
+        "properties": {
+          "option_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Option Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "option_id"
+        ],
+        "title": "ClarificationDecision"
+      },
       "CommitmentList": {
         "properties": {
           "items": {
@@ -1698,6 +2275,70 @@
         ],
         "title": "CommitmentView"
       },
+      "CompositionInput": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "minimum_balance_cents": {
+            "type": "integer",
+            "maximum": 100000000.0,
+            "minimum": 0.0,
+            "title": "Minimum Balance Cents",
+            "default": 0
+          },
+          "instances": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateInstance"
+            },
+            "type": "array",
+            "maxItems": 6,
+            "minItems": 1,
+            "title": "Instances"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "instances"
+        ],
+        "title": "CompositionInput"
+      },
+      "ConflictDecision": {
+        "properties": {
+          "choice": {
+            "type": "string",
+            "enum": [
+              "execute_plan",
+              "keep_subscription",
+              "pause_all"
+            ],
+            "title": "Choice"
+          },
+          "selected_plan_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Plan Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "choice"
+        ],
+        "title": "ConflictDecision"
+      },
       "ConstraintSnapshot": {
         "properties": {
           "balance_cents": {
@@ -1741,6 +2382,157 @@
           "allowed"
         ],
         "title": "ConstraintSnapshot"
+      },
+      "ConversationInput": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Request Id"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Message"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "focus_plan_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focus Plan Id"
+          },
+          "focus_plan_version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focus Plan Version"
+          },
+          "focus_step_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focus Step Id"
+          },
+          "focus_field": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "amount_cents",
+                  "minimum_balance_cents"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focus Field"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "message"
+        ],
+        "title": "ConversationInput"
+      },
+      "ConversationResponse": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "turn_id": {
+            "type": "string",
+            "title": "Turn Id"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "planned",
+              "amended",
+              "clarification",
+              "interrupted",
+              "reused",
+              "informational"
+            ],
+            "title": "Outcome"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskPlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "clarification": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clarification"
+          },
+          "recommendations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Recommendations"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "turn_id",
+          "outcome",
+          "message"
+        ],
+        "title": "ConversationResponse"
       },
       "DemoLogin": {
         "properties": {
@@ -1837,6 +2629,43 @@
         ],
         "title": "ExecutionReceipt"
       },
+      "FaultInput": {
+        "properties": {
+          "plan_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Plan Id"
+          },
+          "plan_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Plan Version"
+          },
+          "step_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Step Id"
+          },
+          "point": {
+            "type": "string",
+            "enum": [
+              "before_post_reject",
+              "after_mutation_rollback",
+              "verify_timeout"
+            ],
+            "title": "Point"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "plan_id",
+          "plan_version",
+          "step_id",
+          "point"
+        ],
+        "title": "FaultInput"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1895,13 +2724,15 @@
               "planned",
               "waiting_approval",
               "waiting_clarification",
+              "waiting_conflict",
               "executing",
               "pending_verification",
               "partially_completed",
               "handed_off",
               "succeeded",
               "failed",
-              "paused"
+              "paused",
+              "cancelled"
             ],
             "title": "Prior Status"
           },
@@ -1969,6 +2800,100 @@
         ],
         "title": "HandoffRelease"
       },
+      "InterruptInput": {
+        "properties": {
+          "plan_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Plan Version"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "step_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "plan_version",
+          "reason"
+        ],
+        "title": "InterruptInput"
+      },
+      "InterruptionReview": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "cancelled_step_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cancelled Step Ids"
+          },
+          "blocked_step_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Blocked Step Ids"
+          },
+          "retained_receipt_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Retained Receipt Ids"
+          },
+          "unknown_receipt_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown Receipt Ids"
+          },
+          "compensation_items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Compensation Items"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "created_at",
+          "message"
+        ],
+        "title": "InterruptionReview"
+      },
       "PlanInput": {
         "properties": {
           "message": {
@@ -2005,6 +2930,11 @@
           "remaining": {
             "type": "integer",
             "title": "Remaining",
+            "default": 0
+          },
+          "cancelled": {
+            "type": "integer",
+            "title": "Cancelled",
             "default": 0
           }
         },
@@ -2270,6 +3200,30 @@
         ],
         "title": "RecipientView"
       },
+      "SandboxReset": {
+        "properties": {
+          "confirmation": {
+            "type": "string",
+            "const": "RESET_SYNTHETIC_DATA",
+            "title": "Confirmation"
+          },
+          "scenario": {
+            "type": "string",
+            "enum": [
+              "baseline",
+              "tight_budget"
+            ],
+            "title": "Scenario",
+            "default": "baseline"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "confirmation"
+        ],
+        "title": "SandboxReset"
+      },
       "ScheduleAction": {
         "properties": {
           "account_id": {
@@ -2403,10 +3357,12 @@
             "type": "string",
             "enum": [
               "0.1",
-              "0.2"
+              "0.2",
+              "0.3",
+              "0.4"
             ],
             "title": "Schema Version",
-            "default": "0.2"
+            "default": "0.4"
           },
           "plan_id": {
             "type": "string",
@@ -2426,6 +3382,7 @@
             "enum": [
               "rules",
               "ollama",
+              "openai_compatible",
               "structured",
               "schedule"
             ],
@@ -2442,13 +3399,15 @@
               "planned",
               "waiting_approval",
               "waiting_clarification",
+              "waiting_conflict",
               "executing",
               "pending_verification",
               "partially_completed",
               "handed_off",
               "succeeded",
               "failed",
-              "paused"
+              "paused",
+              "cancelled"
             ],
             "title": "Status",
             "default": "planned"
@@ -2471,6 +3430,41 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/HandoffRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ready_step_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ready Step Ids"
+          },
+          "activated_until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activated Until"
+          },
+          "conflict_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Conflict Ids"
+          },
+          "interruption": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InterruptionReview"
               },
               {
                 "type": "null"
@@ -2536,19 +3530,54 @@
               }
             }
           },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "template_instance_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Instance Id"
+          },
+          "template_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Version"
+          },
           "status": {
             "type": "string",
             "enum": [
               "planned",
               "waiting_approval",
               "waiting_clarification",
+              "waiting_conflict",
               "executing",
               "pending_verification",
               "partially_completed",
               "handed_off",
               "succeeded",
               "failed",
-              "paused"
+              "paused",
+              "cancelled"
             ],
             "title": "Status",
             "default": "planned"
@@ -2633,6 +3662,72 @@
           "action"
         ],
         "title": "TaskStep"
+      },
+      "TemplateInstance": {
+        "properties": {
+          "instance_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Instance Id"
+          },
+          "template_id": {
+            "type": "string",
+            "enum": [
+              "bill_analysis",
+              "subscription_management",
+              "smart_transfer"
+            ],
+            "title": "Template Id"
+          },
+          "action": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReadAction"
+              },
+              {
+                "$ref": "#/components/schemas/TransferAction"
+              },
+              {
+                "$ref": "#/components/schemas/ScheduleAction"
+              },
+              {
+                "$ref": "#/components/schemas/CancelAction"
+              }
+            ],
+            "title": "Action",
+            "discriminator": {
+              "propertyName": "tool",
+              "mapping": {
+                "analyze_bills": "#/components/schemas/ReadAction",
+                "balance": "#/components/schemas/ReadAction",
+                "cancel_subscription": "#/components/schemas/CancelAction",
+                "commitments": "#/components/schemas/ReadAction",
+                "recipients": "#/components/schemas/ReadAction",
+                "schedule_transfer": "#/components/schemas/ScheduleAction",
+                "subscriptions": "#/components/schemas/ReadAction",
+                "transactions": "#/components/schemas/ReadAction",
+                "transfer": "#/components/schemas/TransferAction"
+              }
+            }
+          },
+          "depends_on": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Depends On"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "instance_id",
+          "template_id",
+          "action"
+        ],
+        "title": "TemplateInstance"
       },
       "TransactionList": {
         "properties": {

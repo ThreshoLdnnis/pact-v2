@@ -7,7 +7,7 @@ from pathlib import Path
 import secrets
 import threading
 import time
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -16,11 +16,15 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from sqlalchemy import select, func
 from contracts.models import AccountList, ApprovalDecision, BankingCommand, BankingExecutionResult, CandidatePlan, DemoLogin, ExecutionReceipt, HandoffInput, HandoffRelease, PlanInput, PolicyCommand, PolicyEvaluation, ReadResult, ReceiptVerification, RecipientSelection, TaskPlan
+from contracts.models import CompositionInput, FaultInput, SandboxReset
+from contracts.models import ClarificationDecision, ConflictDecision, ConversationInput, ConversationResponse, InterruptInput
 from pact.audit import record, verify_chain
 from pact.common import DomainError, digest, now, stamp, uid
-from pact.storage import Account, ApprovalRow, Audit, Commitment, Database, Ledger, PlanRow, SessionRow, Subscription
-from services.agent import engine, planner
+from pact.storage import Account, ApprovalRow, Audit, ClarificationRow, Commitment, ConflictRow, ConversationRow, Database, Ledger, PlanRow, PreferenceRow, SessionRow, Subscription, TurnRow
+from pact.settings import load_local_env
+from services.agent import conversation, coordination, engine, model_adapter, planner, templates
 from services.banking import service as bank
+from services.sandbox import acceptance, controls
 
 
 class BodyLimitMiddleware:
@@ -40,6 +44,7 @@ class BodyLimitMiddleware:
 
 
 def create_app(database_url=None, scheduler=True):
+    load_local_env()
     db = Database(database_url or os.getenv("PACT_DATABASE_URL", "sqlite:///data/pact.db"))
     with db.session(write=True) as session:
         bank.seed(session)
@@ -68,12 +73,22 @@ def create_app(database_url=None, scheduler=True):
                 await task
         db.engine.dispose()
 
-    app = FastAPI(title="PACT V2.0 Sandbox", version="0.2.0", lifespan=lifespan, description="仅合成数据的银行 Agent MVP。候选计划与银行工具 API 分离；模型不具备执行权限。")
+    app = FastAPI(title="PACT V2.0 Sandbox", version="0.4.0", lifespan=lifespan, description="仅合成数据的银行 Agent MVP。候选计划与银行工具 API 分离；模型不具备执行权限。")
     app.state.db = db
     app.add_middleware(BodyLimitMiddleware)
     app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type"])
     bearer = HTTPBearer(auto_error=False)
     login_attempts, login_lock = {}, threading.Lock()
+    admin_token = os.getenv("PACT_SANDBOX_ADMIN_TOKEN", "")
+    controls_enabled = os.getenv("PACT_SANDBOX_CONTROLS") == "1" and len(admin_token) >= 24
+    db.sandbox_controls_enabled = controls_enabled
+
+    def sandbox_admin(x_sandbox_admin: str = Header(default="")):
+        if not controls_enabled:
+            raise DomainError("SANDBOX_CONTROLS_DISABLED", "测试控制入口未启用", 404)
+        if not secrets.compare_digest(x_sandbox_admin.encode(), admin_token.encode()):
+            raise DomainError("SANDBOX_ADMIN_REQUIRED", "需要独立的沙箱管理员令牌；演示会话不具备此权限", 403)
+        return "sandbox_admin"
 
     @app.middleware("http")
     async def headers(request, call_next):
@@ -140,11 +155,30 @@ def create_app(database_url=None, scheduler=True):
 
     @app.get("/health", tags=["System"])
     def health():
-        return {"status": "ok", "sandbox": True, "version": "0.2.0"}
+        return {"status": "ok", "sandbox": True, "version": "0.4.0"}
 
     @app.get("/api/v1/meta", tags=["System"])
     def meta():
-        return {"sandbox": True, "planner": "ollama" if os.getenv("PACT_OLLAMA_URL") and os.getenv("PACT_OLLAMA_MODEL") else "rules", "currency": "CNY", "amount_unit": "integer_cents", "timezone": "Asia/Shanghai", "strong_verification": "simulation_only"}
+        return {"sandbox": True, "planner": model_adapter.provider() if model_adapter.provider() in {"rules", "ollama", "openai_compatible"} else "unconfigured", "currency": "CNY", "amount_unit": "integer_cents", "timezone": "Asia/Shanghai", "strong_verification": "simulation_only", "sandbox_controls_enabled": controls_enabled}
+
+    @app.post("/api/v1/sandbox/reset", tags=["Sandbox controls"])
+    def reset_sandbox(command: SandboxReset, admin=Depends(sandbox_admin)):
+        result = mutate(admin, lambda s: controls.reset(s, command.scenario))
+        with login_lock:
+            login_attempts.clear()
+        return result
+
+    @app.post("/api/v1/sandbox/faults", tags=["Sandbox controls"])
+    def inject_fault(command: FaultInput, admin=Depends(sandbox_admin)):
+        return mutate(admin, lambda s: controls.arm(s, command))
+
+    @app.post("/api/v1/sandbox/faults/clear", tags=["Sandbox controls"])
+    def clear_faults(admin=Depends(sandbox_admin)):
+        return mutate(admin, controls.clear)
+
+    @app.get("/api/v1/sandbox/acceptance", tags=["Sandbox controls"])
+    def independent_acceptance(admin=Depends(sandbox_admin)):
+        return acceptance.inspect_database(db.engine.url.database)
 
     @app.post("/api/v1/auth/demo-session", tags=["Demo auth"])
     def login(command: DemoLogin, request: Request):
@@ -177,8 +211,63 @@ def create_app(database_url=None, scheduler=True):
         candidate, source = candidate_for(user, command.message)
         return mutate(user, lambda s: engine.create_plan(s, user, candidate, source))
 
+    @app.post("/api/v1/agent/messages", response_model=ConversationResponse, tags=["Conversation"])
+    def message(command: ConversationInput, user=Depends(principal)):
+        with db.session() as session:
+            cached = conversation.prior(session, user, command)
+            if cached:
+                return cached
+            if command.conversation_id:
+                bank.owned(session, ConversationRow, command.conversation_id, user)
+            if command.focus_plan_id:
+                bank.owned(session, PlanRow, command.focus_plan_id, user)
+        # Model calls, if configured, happen before the write lock. State is rechecked.
+        prepared, preparation_error = None, None
+        if not conversation.contextual(command.message):
+            try:
+                prepared = candidate_for(user, command.message)
+            except DomainError as error:
+                preparation_error = error
+        return mutate(user, lambda s: conversation.handle(s, user, command, prepared, preparation_error))
+
+    @app.get("/api/v1/agent/conversations/{conversation_id}", tags=["Conversation"])
+    def conversation_detail(conversation_id: str, user=Depends(principal)):
+        with db.session() as session:
+            row = bank.owned(session, ConversationRow, conversation_id, user)
+            turns = session.scalars(select(TurnRow).where(TurnRow.user_id == user, TurnRow.conversation_id == row.id).order_by(TurnRow.created_at).limit(100)).all()
+            questions = session.scalars(select(ClarificationRow).where(ClarificationRow.user_id == user, ClarificationRow.conversation_id == row.id)).all()
+            return {"conversation_id": row.id, "plan_ids": row.document.get("plan_ids", []), "turns": [t.response for t in turns], "clarifications": [q.document for q in questions]}
+
+    @app.post("/api/v1/agent/clarifications/{clarification_id}/decision", response_model=ConversationResponse, tags=["Conversation"])
+    def clarification_decision(clarification_id: str, command: ClarificationDecision, user=Depends(principal)):
+        return mutate(user, lambda s: conversation.resolve(s, user, clarification_id, command))
+
+    @app.get("/api/v1/agent/conflicts", tags=["Coordination"])
+    def conflicts(user=Depends(principal)):
+        with db.session() as session:
+            items = [c.document for c in session.scalars(select(ConflictRow).where(ConflictRow.user_id == user))]
+            return {"items": sorted(items, key=lambda x: x["created_at"], reverse=True)[:100]}
+
+    @app.post("/api/v1/agent/conflicts/{conflict_id}/decision", tags=["Coordination"])
+    def conflict_decision(conflict_id: str, command: ConflictDecision, user=Depends(principal)):
+        return mutate(user, lambda s: coordination.decide(s, user, conflict_id, command))
+
+    @app.get("/api/v1/agent/intent-preferences", tags=["Coordination"])
+    def intent_preferences(user=Depends(principal)):
+        with db.session() as session:
+            return {"items": [{"preference_id": p.id, "account_id": p.account_id, "subscription_id": p.subscription_id, "created_at": p.created_at, "meaning": "用户明确的保留意图，不代表当前协议已开通"} for p in session.scalars(select(PreferenceRow).where(PreferenceRow.user_id == user, PreferenceRow.active.is_(True)))]}
+
     @app.post("/api/v1/agent/candidates", response_model=TaskPlan, tags=["Agent Task Protocol"])
     def structured(candidate: CandidatePlan, user=Depends(principal)):
+        return mutate(user, lambda s: engine.create_plan(s, user, candidate))
+
+    @app.get("/api/v1/agent/templates", tags=["Agent Task Protocol"])
+    def template_catalog(user=Depends(principal)):
+        return {"items": templates.CATALOG, "composition": "outer dependencies; inner gates are server enforced"}
+
+    @app.post("/api/v1/agent/compositions", response_model=TaskPlan, tags=["Agent Task Protocol"])
+    def composition(command: CompositionInput, user=Depends(principal)):
+        candidate = templates.compose(command)
         return mutate(user, lambda s: engine.create_plan(s, user, candidate))
 
     @app.get("/api/v1/agent/plans", tags=["Agent Task Protocol"])
@@ -201,16 +290,11 @@ def create_app(database_url=None, scheduler=True):
 
     @app.post("/api/v1/agent/plans/{plan_id}/pause", response_model=TaskPlan, tags=["Agent Task Protocol"])
     def pause(plan_id: str, user=Depends(principal)):
-        def op(session):
-            row, plan = engine.get_plan(session, user, plan_id)
-            if plan.status in {"succeeded", "failed", "partially_completed", "pending_verification", "handed_off"}:
-                raise DomainError("TERMINAL_PLAN", "终态计划不能暂停")
-            engine.expire_approvals(session, user, plan_id)
-            plan.status = "paused"
-            engine.save(row, plan)
-            record(session, user, "plan.paused", plan_id)
-            return plan
-        return mutate(user, op)
+        return mutate(user, lambda s: engine.pause_plan(s, user, plan_id))
+
+    @app.post("/api/v1/agent/plans/{plan_id}/interrupt", response_model=TaskPlan, tags=["Agent Task Protocol"])
+    def interrupt(plan_id: str, command: InterruptInput, user=Depends(principal)):
+        return mutate(user, lambda s: engine.interrupt(s, user, plan_id, command))
 
     @app.post("/api/v1/agent/plans/{plan_id}/replan", response_model=TaskPlan, tags=["Agent Task Protocol"])
     def replan(plan_id: str, command: PlanInput, user=Depends(principal)):

@@ -2,11 +2,17 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type {
   ApprovalRequest,
+  ConversationInput,
+  ConversationResponse,
   ExecutionReceipt,
   TaskPlan,
   TaskStep,
 } from "./protocol";
 import "./style.css";
+import { SandboxPanel } from "./SandboxPanel";
+import { DependencyGraph } from "./DependencyGraph";
+import { InteractionPanel } from "./InteractionPanel";
+import type { Conflict, Question } from "./InteractionPanel";
 
 type Constraints = {
   balance_cents: number;
@@ -62,6 +68,8 @@ const stateNames: Record<string, string> = {
   pending_verification: "结果待核验",
   partially_completed: "部分完成 · 已停止",
   handed_off: "人工接管中",
+  waiting_conflict: "等待你选择冲突任务",
+  cancelled: "已停止",
 };
 const demoPrompts = [
   "分析本月账单，取消视频会员，再给张三转账500元，至少保留1000元",
@@ -101,6 +109,13 @@ function App() {
   const [recipients, setRecipients] = useState<{recipient_id: string; name: string; account_hint: string}[]>([]);
   const [handoffNote, setHandoffNote] = useState("请人工检查当前计划，保留真实交易记录");
   const [uncertainPlan, setUncertainPlan] = useState("");
+  const [conversationId, setConversationId] = useState(sessionStorage.getItem("pact-conversation") || "");
+  const [question, setQuestion] = useState<Question>();
+  const [conflicts, setConflicts] = useState<Conflict[]>([]);
+  const [contextFocus, setContextFocus] = useState<{plan_id: string; version: number}>();
+  const [pendingMessage, setPendingMessage] = useState<ConversationInput | undefined>(() => {
+    try { return JSON.parse(sessionStorage.getItem("pact-pending-message") || "null") || undefined; } catch { return undefined; }
+  });
 
   async function api<T>(
     path: string,
@@ -131,7 +146,9 @@ function App() {
         setToken("");
         sessionStorage.removeItem("pact-token");
       }
-      throw new Error(data.error?.message || "请求未成功，请稍后重试");
+      const failure = new Error(data.error?.message || "请求未成功，请稍后重试") as Error & {status: number};
+      failure.status = response.status;
+      throw failure;
     }
     return data as T;
   }
@@ -150,7 +167,7 @@ function App() {
   }
 
   async function refresh(auth = token) {
-    const [a, g, p, ap, au, meta, rp] = await Promise.all([
+    const [a, g, p, ap, au, meta, rp, cf] = await Promise.all([
       api<{ items: Account[] }>("/banking/accounts", "GET", undefined, auth),
       api<Graph>("/banking/commitment-graph", "GET", undefined, auth),
       api<{ items: TaskPlan[] }>("/agent/plans", "GET", undefined, auth),
@@ -163,6 +180,7 @@ function App() {
       api<AuditView>("/audit", "GET", undefined, auth),
       api<{ planner: string }>("/meta", "GET", undefined, auth),
       api<{items: {recipient_id: string; name: string; account_hint: string}[]}>(`/banking/accounts/acct-${user}/recipients`, "GET", undefined, auth),
+      api<{items: Conflict[]}>("/agent/conflicts", "GET", undefined, auth),
     ]);
     setAccount(a.items[0]);
     setGraph(g);
@@ -171,10 +189,24 @@ function App() {
     setAudit(au);
     setPlanner(meta.planner);
     setRecipients(rp.items);
+    setConflicts(cf.items);
+    setPlan(previous => previous ? p.items.find(item => item.plan_id === previous.plan_id) || previous : previous);
   }
 
   useEffect(() => {
-    if (token) void perform(() => refresh(token));
+    if (token) void perform(async () => {
+      await refresh(token);
+      if (conversationId) {
+        try {
+          const state = await api<{turns: ConversationResponse[]; clarifications: Question[]}>(`/agent/conversations/${conversationId}`);
+          setChats(state.turns.map(t => ({role: "agent", text: t.message})));
+          setQuestion(state.clarifications.filter(q => q.status === "pending").at(-1));
+        } catch (e) {
+          if ((e as {status?: number}).status === 404) { setConversationId(""); sessionStorage.removeItem("pact-conversation"); }
+          else throw e;
+        }
+      }
+    });
   }, [token]);
   useEffect(() => {
     setCode("");
@@ -205,6 +237,10 @@ function App() {
             ? "计划部分完成后已停止。已发生的交易保持有效，后续步骤尚未完成。"
           : state === "handed_off"
             ? "已转入人工接管，旧审批失效，自动执行已冻结。"
+          : state === "waiting_conflict"
+            ? "相关请求存在冲突，等待你选择；不会按到达先后自动付款。"
+          : state === "cancelled"
+            ? "未执行部分已停止。请查看已发生动作的检查结果。"
           : state === "failed"
             ? "执行已停止。已完成步骤会保留，请查看失败原因后重规划。"
             : `计划${stateNames[state]}。`;
@@ -221,16 +257,40 @@ function App() {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!message.trim()) return;
+    if (!message.trim() || pendingMessage) return;
     await perform(async () => {
       const text = message;
       setChats((c) => [...c, { role: "user", text }]);
       setMessage("");
-      const p = await api<TaskPlan>("/agent/plans", "POST", { message: text });
-      setPlan(p);
-      showPlan(await api<TaskPlan>(`/agent/plans/${p.plan_id}/run`, "POST"));
-      await refresh();
+      const body: ConversationInput = {request_id: "message_" + crypto.randomUUID().replaceAll("-", ""), message: text,
+        ...(conversationId ? {conversation_id: conversationId} : {}),
+        ...(contextFocus ? {focus_plan_id: contextFocus.plan_id, focus_plan_version: contextFocus.version} : {})};
+      await sendMessage(body);
     });
+  }
+
+  function acceptConversation(result: ConversationResponse) {
+    setConversationId(result.conversation_id);
+    sessionStorage.setItem("pact-conversation", result.conversation_id);
+    setQuestion(result.clarification as Question | undefined);
+    setChats(c => [...c, {role: "agent", text: [result.message, ...(result.recommendations || [])].join("\n")}]);
+    if (result.plan) showPlan(result.plan);
+    if (result.outcome === "planned") setContextFocus(undefined);
+  }
+
+  async function sendMessage(body: ConversationInput) {
+    setPendingMessage(body);
+    sessionStorage.setItem("pact-pending-message", JSON.stringify(body));
+    try {
+      const result = await api<ConversationResponse>("/agent/messages", "POST", body);
+      setPendingMessage(undefined); sessionStorage.removeItem("pact-pending-message");
+      acceptConversation(result);
+      await refresh();
+    } catch (e) {
+      const status = (e as {status?: number}).status;
+      if (status && status >= 400 && status < 500) { setPendingMessage(undefined); sessionStorage.removeItem("pact-pending-message"); }
+      throw e;
+    }
   }
 
   const waitingStep = plan?.steps.find((s) => s.status === "waiting_approval");
@@ -290,6 +350,7 @@ function App() {
             ["work", "◈", "Agent 工作台"],
             ["graph", "⌁", "资金承诺"],
             ["receipts", "▤", "回执与审计"],
+            ["sandbox", "⚙", "沙箱测试"],
           ].map(([id, icon, text]) => (
             <button
               key={id}
@@ -326,7 +387,7 @@ function App() {
                 ? "Agent 工作台"
                 : tab === "graph"
                   ? "资金承诺"
-                  : "回执与审计"}
+                  : tab === "sandbox" ? "沙箱测试" : "回执与审计"}
             </strong>
           </div>
           <div className="header-right">
@@ -344,6 +405,7 @@ function App() {
                     setPlan(undefined);
                     setPlans([]);
                     setChats([]);
+                    setConversationId(""); setQuestion(undefined); setPendingMessage(undefined); setContextFocus(undefined); setConflicts([]);
                     sessionStorage.clear();
                   })
                 }
@@ -363,7 +425,7 @@ function App() {
                   ? "把意图，变成可验证的行动。"
                   : tab === "graph"
                     ? "每一笔支出，都有承诺边界。"
-                    : "每一次执行，都能追溯。"}
+                    : tab === "sandbox" ? "让每个边界，都能重复验证。" : "每一次执行，都能追溯。"}
               </h1>
               <p>理解请求 · 约束先行 · 你来授权 · 回执说话</p>
             </div>
@@ -392,7 +454,15 @@ function App() {
               {notice}
             </div>
           )}
-          {!token ? (
+          {tab === "sandbox" ? <SandboxPanel plan={plan} onReset={() => {
+            setToken(""); setPlan(undefined); setPlans([]); setChats([]); setApprovals([]);
+            setAccount(undefined); setGraph({nodes: [], edges: []}); setDetail(undefined);
+            setUncertainPlan(""); setCode(""); setDemoCode(""); setRecipients([]);
+            setAudit({chain_valid: true, items: []});
+            setConversationId(""); setQuestion(undefined); setPendingMessage(undefined); setContextFocus(undefined); setConflicts([]);
+            sessionStorage.removeItem("pact-token"); sessionStorage.removeItem("pact-user");
+            sessionStorage.removeItem("pact-conversation"); sessionStorage.removeItem("pact-pending-message");
+          }} /> : !token ? (
             <section className="login-card">
               <div className="section-kicker">01 / ENTER THE SANDBOX</div>
               <h2>进入你的模拟账户</h2>
@@ -524,7 +594,7 @@ function App() {
                           placeholder="例如：分析本月账单，取消视频会员，再给张三转账500元"
                           maxLength={2000}
                           rows={3}
-                          disabled={busy}
+                          disabled={busy || Boolean(pendingMessage)}
                         />
                         <div>
                           <small>
@@ -532,13 +602,27 @@ function App() {
                           </small>
                           <button
                             className="primary"
-                            disabled={busy || !message.trim()}
+                            disabled={busy || Boolean(pendingMessage) || !message.trim()}
                           >
                             {busy ? "处理中…" : "生成并检查计划 ↗"}
                           </button>
                         </div>
                       </form>
+                      <div className="context-controls">
+                        <p>{contextFocus ? "省略表达将关联你选中的任务；任务版本变化时会要求刷新。" : "省略表达按当前会话关联；存在多个合理对象时会澄清。"}</p>
+                        <button disabled={busy || !plan} onClick={() => plan && setContextFocus({plan_id: plan.plan_id, version: plan.version || 1})}>关联当前选中任务</button>
+                        <button disabled={busy || !contextFocus} onClick={() => setContextFocus(undefined)}>取消指定关联</button>
+                        <button disabled={busy || Boolean(pendingMessage)} onClick={() => {setConversationId(""); sessionStorage.removeItem("pact-conversation"); setChats([]); setQuestion(undefined); setContextFocus(undefined); setNotice("已开始新对话，已有任务仍保留，可在计划列表中查看。");}}>新对话</button>
+                      </div>
+                      {pendingMessage && <div className="alert" role="status"><p>上条消息响应未确认。请恢复同一请求，不要重新发送付款要求。</p><button disabled={busy} onClick={() => void perform(() => sendMessage(pendingMessage))}>恢复上次消息结果</button></div>}
                     </section>
+                    <InteractionPanel question={question} conflicts={conflicts} plan={plan} busy={busy}
+                      onClarify={(id, option) => void perform(async () => {acceptConversation(await api<ConversationResponse>(`/agent/clarifications/${id}/decision`, "POST", {option_id: option})); await refresh();})}
+                      onConflict={(id, choice, selectedPlanId) => void perform(async () => {
+                        const r = await api<{plans: TaskPlan[]; message: string}>(`/agent/conflicts/${id}/decision`, "POST", {choice, ...(selectedPlanId ? {selected_plan_id: selectedPlanId} : {})});
+                        const selected = r.plans.find(p => p.plan_id === selectedPlanId) || r.plans[0]; if (selected) setPlan(selected); setNotice(r.message); await refresh();
+                      })}
+                      onInterrupt={() => void perform(async () => {if (plan) await planOperation("interrupt", {plan_version: plan.version, reason: "用户在工作台停止后续并检查已完成动作"});})} />
                     {bill && (
                       <section className="panel bill-panel">
                         <div className="panel-heading">
@@ -590,7 +674,7 @@ function App() {
                         })}>申请取消</button>
                       </div>)}
                     </section>}
-                    {plan && ["failed", "partially_completed", "waiting_clarification"].includes(plan.status || "") && (
+                    {plan && ["failed", "partially_completed", "waiting_clarification", "cancelled", "paused"].includes(plan.status || "") && (
                       <section className="panel replan-panel">
                         <h2>根据最新状态重规划</h2>
                         <p>保留已核验步骤，重新检查资金约束，旧审批失效。</p>
@@ -661,6 +745,8 @@ function App() {
                             </small>
                           </div>
                           <p className="progress-summary" aria-live="polite">已核验 {plan.progress?.completed || 0} · 失败 {plan.progress?.failed || 0} · 待核验 {plan.progress?.pending_verification || 0} · 未完成 {plan.progress?.remaining || 0}</p>
+                          <p className="muted">无依赖的分支可以独立推进；依赖步骤须经回执核验。依赖已满足：{plan.ready_step_ids?.join("、") || "无"}（仍需检查授权）。</p>
+                          <DependencyGraph plan={plan} />
                           <ol className="dag">
                             {plan.steps.map((s, i) => (
                               <li key={s.step_id} className={s.status}>
@@ -672,6 +758,7 @@ function App() {
                                 <div className="step-content">
                                   <div>
                                     <b>{toolNames[s.action.tool]}</b>
+                                    {s.template_instance_id && <small>模板实例 {s.template_instance_id} · v{s.template_version}</small>}
                                     {s.risk_level && (
                                       <span className={"risk " + s.risk_level}>
                                         {s.risk_level === "green"
@@ -733,7 +820,7 @@ function App() {
                             <button
                               disabled={
                                 busy ||
-                                ["succeeded", "failed", "paused", "pending_verification", "partially_completed", "handed_off"].includes(
+                                ["succeeded", "failed", "paused", "pending_verification", "partially_completed", "handed_off", "cancelled"].includes(
                                   plan.status || "",
                                 )
                               }
@@ -754,7 +841,7 @@ function App() {
                             <button
                               disabled={
                                 busy || Boolean(uncertainPlan) ||
-                                ["succeeded", "failed", "pending_verification", "partially_completed", "handed_off", "waiting_clarification"].includes(
+                                ["succeeded", "failed", "pending_verification", "partially_completed", "handed_off", "waiting_clarification", "waiting_conflict", "cancelled"].includes(
                                   plan.status || "",
                                 )
                               }
@@ -925,6 +1012,7 @@ function App() {
                             }
                             onClick={() => {
                               setPlan(p);
+                              setContextFocus({plan_id: p.plan_id, version: p.version || 1});
                               setTab("work");
                             }}
                           >

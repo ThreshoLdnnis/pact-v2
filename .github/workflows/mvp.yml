@@ -38,6 +38,9 @@ jobs:
   docker-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      PACT_SANDBOX_CONTROLS: '1'
+      PACT_SANDBOX_ADMIN_TOKEN: ci-synthetic-only-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,6 +55,13 @@ jobs:
           curl --fail http://127.0.0.1:8000/health
       - run: python scripts/smoke_http.py
       - run: python scripts/smoke_business.py
+      - run: python scripts/smoke_sandbox.py
+      - run: python scripts/smoke_context.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sandbox-http-evidence
+          path: reports/*http*.json
       - run: docker compose logs --tail 100
         if: always()
       - run: docker compose down -v

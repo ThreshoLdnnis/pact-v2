@@ -1418,3 +1418,16 @@ footer a {
 .recipient-choice { background: #fffdf7; text-align: left; cursor: pointer; }
 .recipient-choice span, .recipient-choice small, .subscription-row small { font-size: 11px; color: #596b65; }
 .subscription-row small { display: block; margin-top: 5px; }
+.sandbox-controls { max-width: 920px; }
+.sandbox-controls label { display: block; margin: 16px 0; }
+.sandbox-controls input:not([type="checkbox"]), .sandbox-controls select { display: block; width: 100%; margin-top: 8px; }
+.sandbox-controls input[type="checkbox"] { width: auto; margin-right: 8px; }
+.sandbox-controls pre { overflow: auto; max-height: 420px; white-space: pre-wrap; }
+.dependency-diagram { overflow-x: auto; margin: 12px 0 20px; border: 1px solid #e1e8df; border-radius: 10px; }
+.dependency-diagram svg { display: block; width: 100%; max-height: 440px; }
+.context-controls { padding: 0 20px 18px; color: #496451; font-size: 12px; }
+.context-controls button { margin: 4px 8px 4px 0; }
+.conflict-panel { border: 1px solid #dca846; }
+.state.waiting_conflict { color: #775016; background: #fff3d4; }
+.state.cancelled { color: #68776d; background: #eef1ed; }
+.chat-message div { white-space: pre-wrap; }

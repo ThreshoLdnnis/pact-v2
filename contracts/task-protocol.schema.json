@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "PACT Task Protocol 0.2",
+  "title": "PACT Task Protocol 0.4",
   "$defs": {
     "CancelAction": {
       "additionalProperties": false,
@@ -308,13 +308,15 @@
             "planned",
             "waiting_approval",
             "waiting_clarification",
+            "waiting_conflict",
             "executing",
             "pending_verification",
             "partially_completed",
             "handed_off",
             "succeeded",
             "failed",
-            "paused"
+            "paused",
+            "cancelled"
           ],
           "title": "Prior Status",
           "type": "string"
@@ -363,6 +365,66 @@
       "title": "HandoffRecord",
       "type": "object"
     },
+    "InterruptionReview": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "cancelled_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Cancelled Step Ids",
+          "type": "array"
+        },
+        "blocked_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocked Step Ids",
+          "type": "array"
+        },
+        "retained_receipt_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Retained Receipt Ids",
+          "type": "array"
+        },
+        "unknown_receipt_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Unknown Receipt Ids",
+          "type": "array"
+        },
+        "compensation_items": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Compensation Items",
+          "type": "array"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason",
+        "created_at",
+        "message"
+      ],
+      "title": "InterruptionReview",
+      "type": "object"
+    },
     "PlanProgress": {
       "additionalProperties": false,
       "properties": {
@@ -384,6 +446,11 @@
         "remaining": {
           "default": 0,
           "title": "Remaining",
+          "type": "integer"
+        },
+        "cancelled": {
+          "default": 0,
+          "title": "Cancelled",
           "type": "integer"
         }
       },
@@ -495,19 +562,57 @@
           ],
           "title": "Action"
         },
+        "template_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Template Id"
+        },
+        "template_instance_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Template Instance Id"
+        },
+        "template_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Template Version"
+        },
         "status": {
           "default": "planned",
           "enum": [
             "planned",
             "waiting_approval",
             "waiting_clarification",
+            "waiting_conflict",
             "executing",
             "pending_verification",
             "partially_completed",
             "handed_off",
             "succeeded",
             "failed",
-            "paused"
+            "paused",
+            "cancelled"
           ],
           "title": "Status",
           "type": "string"
@@ -602,10 +707,12 @@
       "additionalProperties": false,
       "properties": {
         "schema_version": {
-          "default": "0.2",
+          "default": "0.4",
           "enum": [
             "0.1",
-            "0.2"
+            "0.2",
+            "0.3",
+            "0.4"
           ],
           "title": "Schema Version",
           "type": "string"
@@ -627,6 +734,7 @@
           "enum": [
             "rules",
             "ollama",
+            "openai_compatible",
             "structured",
             "schedule"
           ],
@@ -644,13 +752,15 @@
             "planned",
             "waiting_approval",
             "waiting_clarification",
+            "waiting_conflict",
             "executing",
             "pending_verification",
             "partially_completed",
             "handed_off",
             "succeeded",
             "failed",
-            "paused"
+            "paused",
+            "cancelled"
           ],
           "title": "Status",
           "type": "string"
@@ -673,6 +783,43 @@
           "anyOf": [
             {
               "$ref": "#/$defs/HandoffRecord"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ready_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Ready Step Ids",
+          "type": "array"
+        },
+        "activated_until": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Activated Until"
+        },
+        "conflict_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Conflict Ids",
+          "type": "array"
+        },
+        "interruption": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InterruptionReview"
             },
             {
               "type": "null"
@@ -980,6 +1127,406 @@
       ],
       "title": "HandoffRelease",
       "type": "object"
+    },
+    "TemplateInstance": {
+      "additionalProperties": false,
+      "properties": {
+        "instance_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Instance Id",
+          "type": "string"
+        },
+        "template_id": {
+          "enum": [
+            "bill_analysis",
+            "subscription_management",
+            "smart_transfer"
+          ],
+          "title": "Template Id",
+          "type": "string"
+        },
+        "action": {
+          "discriminator": {
+            "mapping": {
+              "analyze_bills": "#/$defs/ReadAction",
+              "balance": "#/$defs/ReadAction",
+              "cancel_subscription": "#/$defs/CancelAction",
+              "commitments": "#/$defs/ReadAction",
+              "recipients": "#/$defs/ReadAction",
+              "schedule_transfer": "#/$defs/ScheduleAction",
+              "subscriptions": "#/$defs/ReadAction",
+              "transactions": "#/$defs/ReadAction",
+              "transfer": "#/$defs/TransferAction"
+            },
+            "propertyName": "tool"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ReadAction"
+            },
+            {
+              "$ref": "#/$defs/TransferAction"
+            },
+            {
+              "$ref": "#/$defs/ScheduleAction"
+            },
+            {
+              "$ref": "#/$defs/CancelAction"
+            }
+          ],
+          "title": "Action"
+        },
+        "depends_on": {
+          "items": {
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "type": "string"
+          },
+          "maxItems": 12,
+          "title": "Depends On",
+          "type": "array"
+        }
+      },
+      "required": [
+        "instance_id",
+        "template_id",
+        "action"
+      ],
+      "title": "TemplateInstance",
+      "type": "object"
+    },
+    "CompositionInput": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "minimum_balance_cents": {
+          "default": 0,
+          "maximum": 100000000,
+          "minimum": 0,
+          "title": "Minimum Balance Cents",
+          "type": "integer"
+        },
+        "instances": {
+          "items": {
+            "$ref": "#/$defs/TemplateInstance"
+          },
+          "maxItems": 6,
+          "minItems": 1,
+          "title": "Instances",
+          "type": "array"
+        }
+      },
+      "required": [
+        "title",
+        "instances"
+      ],
+      "title": "CompositionInput",
+      "type": "object"
+    },
+    "FaultInput": {
+      "additionalProperties": false,
+      "properties": {
+        "plan_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "plan_version": {
+          "minimum": 1,
+          "title": "Plan Version",
+          "type": "integer"
+        },
+        "step_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Step Id",
+          "type": "string"
+        },
+        "point": {
+          "enum": [
+            "before_post_reject",
+            "after_mutation_rollback",
+            "verify_timeout"
+          ],
+          "title": "Point",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_id",
+        "plan_version",
+        "step_id",
+        "point"
+      ],
+      "title": "FaultInput",
+      "type": "object"
+    },
+    "SandboxReset": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmation": {
+          "const": "RESET_SYNTHETIC_DATA",
+          "title": "Confirmation",
+          "type": "string"
+        },
+        "scenario": {
+          "default": "baseline",
+          "enum": [
+            "baseline",
+            "tight_budget"
+          ],
+          "title": "Scenario",
+          "type": "string"
+        }
+      },
+      "required": [
+        "confirmation"
+      ],
+      "title": "SandboxReset",
+      "type": "object"
+    },
+    "ClarificationDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "option_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Option Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "option_id"
+      ],
+      "title": "ClarificationDecision",
+      "type": "object"
+    },
+    "ConflictDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "choice": {
+          "enum": [
+            "execute_plan",
+            "keep_subscription",
+            "pause_all"
+          ],
+          "title": "Choice",
+          "type": "string"
+        },
+        "selected_plan_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selected Plan Id"
+        }
+      },
+      "required": [
+        "choice"
+      ],
+      "title": "ConflictDecision",
+      "type": "object"
+    },
+    "ConversationInput": {
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Request Id",
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "conversation_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Conversation Id"
+        },
+        "focus_plan_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Focus Plan Id"
+        },
+        "focus_plan_version": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Focus Plan Version"
+        },
+        "focus_step_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Focus Step Id"
+        },
+        "focus_field": {
+          "anyOf": [
+            {
+              "enum": [
+                "amount_cents",
+                "minimum_balance_cents"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Focus Field"
+        }
+      },
+      "required": [
+        "request_id",
+        "message"
+      ],
+      "title": "ConversationInput",
+      "type": "object"
+    },
+    "ConversationResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "conversation_id": {
+          "title": "Conversation Id",
+          "type": "string"
+        },
+        "turn_id": {
+          "title": "Turn Id",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "planned",
+            "amended",
+            "clarification",
+            "interrupted",
+            "reused",
+            "informational"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "plan": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TaskPlan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "clarification": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clarification"
+        },
+        "recommendations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Recommendations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "conversation_id",
+        "turn_id",
+        "outcome",
+        "message"
+      ],
+      "title": "ConversationResponse",
+      "type": "object"
+    },
+    "InterruptInput": {
+      "additionalProperties": false,
+      "properties": {
+        "plan_version": {
+          "minimum": 1,
+          "title": "Plan Version",
+          "type": "integer"
+        },
+        "reason": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "step_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step Id"
+        }
+      },
+      "required": [
+        "plan_version",
+        "reason"
+      ],
+      "title": "InterruptInput",
+      "type": "object"
     }
   },
   "oneOf": [
@@ -1009,6 +1556,30 @@
     },
     {
       "$ref": "#/$defs/HandoffRelease"
+    },
+    {
+      "$ref": "#/$defs/CompositionInput"
+    },
+    {
+      "$ref": "#/$defs/FaultInput"
+    },
+    {
+      "$ref": "#/$defs/SandboxReset"
+    },
+    {
+      "$ref": "#/$defs/ClarificationDecision"
+    },
+    {
+      "$ref": "#/$defs/ConflictDecision"
+    },
+    {
+      "$ref": "#/$defs/ConversationInput"
+    },
+    {
+      "$ref": "#/$defs/ConversationResponse"
+    },
+    {
+      "$ref": "#/$defs/InterruptInput"
     }
   ]
 }

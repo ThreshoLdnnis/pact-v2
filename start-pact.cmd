@@ -2,10 +2,18 @@
 cd /d "%~dp0"
 if exist ".venv\Scripts\python.exe" (
   ".venv\Scripts\python.exe" scripts\bootstrap.py
-) else if exist "%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe" (
-  "%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe" scripts\bootstrap.py
 ) else (
-  py -3.12 scripts\bootstrap.py
+  where py >nul 2>nul
+  if errorlevel 1 (
+    python scripts\bootstrap.py
+  ) else (
+    py -3.12 -c "import sys" >nul 2>nul
+    if errorlevel 1 (
+      py -3 scripts\bootstrap.py
+    ) else (
+      py -3.12 scripts\bootstrap.py
+    )
+  )
 )
 if errorlevel 1 (
   echo Setup failed. See README.md for manual installation.

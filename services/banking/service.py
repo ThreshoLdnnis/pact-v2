@@ -124,7 +124,7 @@ def find_receipt(session, user, key):
     return session.scalars(select(ReceiptRow).where(ReceiptRow.user_id == user, ReceiptRow.idempotency_key == key)).first()
 
 
-def post_action(session, user, plan, step, key):
+def post_action(session, user, plan, step, key, *, fail_after_mutation=False):
     """Caller has rechecked approval; transaction lock covers policy, limits and posting."""
     action = step.action.model_dump(mode="json")
     old = find_receipt(session, user, key)
@@ -177,6 +177,9 @@ def post_action(session, user, plan, step, key):
         result = {"amount_cents": amount, "recipient_id": recipient.id, "recipient_name": recipient.name, "balance_after_cents": account.balance_cents, "constraints_at_execution": constraints}
     else:
         raise DomainError("TOOL_NOT_ALLOWED", "工具不受支持", 422)
+    if fail_after_mutation:
+        session.flush()
+        raise DomainError("INJECTED_ROLLBACK", "测试环境在变更后注入异常；本次事务应完整回滚")
     receipt = ExecutionReceipt(receipt_id=uid("rec"), plan_id=plan.plan_id, plan_version=plan.version, step_id=step.step_id, action_hash=digest(action), operation=tool, status=status, transaction_id=tx, data=result, created_at=stamp())
     doc = receipt.model_dump(mode="json")
     row = ReceiptRow(id=receipt.receipt_id, user_id=user, plan_id=plan.plan_id, plan_version=plan.version, step_id=step.step_id, idempotency_key=key, document=doc, document_hash=digest(doc))
@@ -198,6 +201,7 @@ def verify_receipt(session, user, receipt_id):
         valid = valid and len(entries) == 2 and sum(e.amount_cents for e in entries) == 0
         if matches:
             action = matches[0]["action"]
+            valid = valid and doc["data"].get("amount_cents") == action["amount_cents"] and doc["data"].get("recipient_id") == action["recipient_id"]
             recipient = session.get(Recipient, action["recipient_id"])
             valid = valid and recipient is not None and any(e.account_id == action["account_id"] and e.amount_cents == -action["amount_cents"] for e in entries) and any(e.account_id == recipient.account_id and e.amount_cents == action["amount_cents"] for e in entries)
     if doc["operation"] == "cancel_subscription" and matches and matches[0]["action"]["tool"] == "cancel_subscription":
@@ -227,3 +231,17 @@ def seed(session):
         alice.balance_cents += amount
         clearing.balance_cents -= amount
         session.add_all([Ledger(transaction_id=f"seed-{i}", account_id=alice.id, amount_cents=amount, category=category, memo=memo, created_at=when), Ledger(transaction_id=f"seed-{i}", account_id=clearing.id, amount_cents=-amount, category=category, memo="模拟对手账", created_at=when)])
+
+
+def withdraw_schedule(session, user, receipt_id):
+    """Withdraw an unexecuted registration; never reverse posted funds."""
+    row = owned(session, ReceiptRow, receipt_id, user)
+    if row.document["operation"] != "schedule_transfer" or not verify_receipt(session, user, receipt_id)["verified"]:
+        raise DomainError("SCHEDULE_RECEIPT_INVALID", "登记回执未通过核验")
+    commitment_id = row.document["data"]["commitment"]["commitment_id"]
+    commitment = owned(session, Commitment, commitment_id, user)
+    posted = session.scalars(select(ReceiptRow).where(ReceiptRow.user_id == user, ReceiptRow.plan_id == commitment.execution_plan_id)).all() if commitment.execution_plan_id else []
+    if commitment.status == "fulfilled" or any(r.document["operation"] == "transfer" for r in posted):
+        return {"withdrawn": False, "commitment_id": commitment_id, "execution_plan_id": commitment.execution_plan_id, "reason": "付款已经发生或需要核验，不能撤回登记冒充撤销付款"}
+    commitment.status = "cancelled"
+    return {"withdrawn": True, "commitment_id": commitment_id, "execution_plan_id": commitment.execution_plan_id, "reason": "仅撤销尚未执行的定时安排，原登记回执保留"}

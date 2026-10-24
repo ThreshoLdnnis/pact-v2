@@ -1,24 +1,24 @@
-# 任务状态协议
+# 状态协议 0.4
 
-| 当前状态 | 允许转移 | 触发条件与责任方 |
-| --- | --- | --- |
-| planned | executing / waiting_approval / paused / failed | 后端检查依赖、权限和约束，用户可暂停 |
-| waiting_approval | executing / paused / failed | 对应审批通过后恢复；拒绝后运行转 failed；过期生成新的待审批请求 |
-| executing | succeeded / failed / waiting_approval / planned | 银行变账与查询核验结果决定；后续步骤可再遇审批门 |
-| paused | planned | 显式 resume 后重新评估，不沿用过期权限 |
-| failed | planned（新版本） | 只能通过 replan 创建新版本，保留已核验完成步骤 |
-| succeeded | 无 | 完成计划保持终态，新请求创建新计划 |
-| waiting_clarification | planned（新版本）/ handed_off | 同名或未知收款人不发付款授权；选择本人候选后生成新版本 |
-| pending_verification | planned / succeeded / handed_off | 原操作可能已发生；只能核验原回执，不能重付或重规划。核验通过不自动执行后续动作 |
-| partially_completed | planned（新版本）/ handed_off | 明确失败前已有成功步骤；保留真实回执，不自动逆向转账 |
-| handed_off | paused / pending_verification / partially_completed / failed / succeeded | 仅持有人显式交还；结果只能来自银行核验，不能手填成功 |
+| 状态 | 含义与出口 |
+| --- | --- |
+| planned | 候选已由后端编译，尚未代表授权；run后检查依赖、冲突、归属、权限与资金 |
+| waiting_clarification | 收款人或上下文不唯一；本人选择有效目标后更新版本，仍需权限检查 |
+| waiting_conflict | 请求不能共同满足；允许独立绿色工作，变更与黄色查询冻结；本人决策后选中任务planned，其余paused |
+| waiting_approval | 等待当前动作绑定的确认或模拟强验证；过期/风险变化重新确认 |
+| executing | 同一数据库事务执行动作并查询核验；不是可持久外部付款成功证明 |
+| pending_verification | 原操作可能发生；只查询原规范回执，冻结后续，不允许重付或重规划；核验通过后显式续跑 |
+| paused | 用户暂停或依赖停止；普通resume重新检查，含被取消前置时需重规划 |
+| cancelled | 未执行目标已停止；不能run/resume复活，需要新版本重规划 |
+| partially_completed | 已有成功事实，后续失败/被停止；保留回执，重规划只处理未完成部分 |
+| failed | 确定失败且无成功步骤；需重规划新版本 |
+| succeeded | 所有步骤有核验结果；不意味着scheduled登记已付款 |
+| handed_off | 人工接管冻结自动执行；原回执可核验，显式交还后按事实回到paused/待核验/完成等状态 |
 
-TaskStep 的 succeeded 表示银行后端回执已查询并核验。TaskPlan 的 succeeded 表示全部步骤完成，但其中 schedule_transfer 的业务结果是已登记、未付款，必须查看 ExecutionReceipt.status，不得将计划完成误解为资金已划出。
+TaskStep.succeeded只由银行回执核验产生。TaskPlan.succeeded表示该计划列出的步骤完成：schedule_transfer的ExecutionReceipt.status=scheduled、paid=false，不能显示为付款已成功。
 
-审批状态：pending、approved、rejected、consumed、expired。approved 只表示用户完成该请求的授权，执行后端仍需重查；实际执行与 consumed 在同一事务提交。rejected 不自动重试。计划版本、动作哈希、主体、步骤或风险级别改变时，旧授权不再适用。
+TaskPlan保存conflict_ids、activated_until和interruption；这些由后端写入，CandidatePlan不可提供。progress统计completed/failed/pending_verification/remaining/cancelled。ready_step_ids只表示依赖满足，不代表通过授权；冲突、暂停和人工接管期间不能作为执行许可。
 
-暂停不撤销已经完成的交易，同步事务中不提供抢占式中断。任务历史与回执跨重启保留；计划重规划不会自动执行反向转账来补偿前序已完成步骤。
+审批状态pending/approved/rejected/consumed/expired。审批绑定主体、计划、版本、步骤、动作哈希、依赖及最低留存；10分钟有效。消费与银行变更同事务。风险升级、修改、暂停、冲突和接管使旧授权失效；拒绝不会自动继续。
 
-0.2补充：executing核验超时/失败转pending_verification；明确失败且已有成功步骤时转partially_completed。progress按completed/failed/pending_verification/remaining分别统计。暂停和接管均作废旧审批；handed_off不能通过/run、/resume、/execute或/replan绕过。人工处理只记录说明、查询原交易和交还，不提供强制成功或改账接口。
-
-旧表为0.1基本路径，新增路径以本段及新增行补充。接管前可以为planned、waiting_approval、waiting_clarification、paused、pending_verification、failed或partially_completed；接管期间核验可更新步骤，但计划仍保持handed_off直到显式交还。
+状态汇总优先保留人工接管与待核验事实，再处理中断/冲突，最后根据步骤完成、失败及等待情况展示。中断保留已完成交易；未知状态不当失败处理；不可用自由文本把回执改成成功。同步提交事务不支持抢占式终止。

@@ -32,7 +32,7 @@ assert plan["status"] == "succeeded"
 assert call("/api/v1/banking/accounts")["items"][0]["balance_cents"] == before - 50000
 assert all(call(f"/api/v1/banking/receipts/{s['receipt_id']}/verify")["verified"] for s in plan["steps"])
 assert call("/api/v1/banking/reconciliation")["balanced"]
-result = {"workflow": "analysis -> cancellation -> transfer", "status": "passed", "plan_id": plan["plan_id"], "receipt_ids": [s["receipt_id"] for s in plan["steps"]], "balance_delta_cents": -50000, "verified": True}
+result = {"workflow": "(analysis || subscription query -> cancellation) -> transfer", "status": "passed", "plan_id": plan["plan_id"], "receipt_ids": [s["receipt_id"] for s in plan["steps"]], "balance_delta_cents": -50000, "verified": True}
 Path("reports").mkdir(exist_ok=True)
 Path("reports/http-smoke.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
 print(json.dumps(result))

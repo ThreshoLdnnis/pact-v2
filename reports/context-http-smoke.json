@@ -1,0 +1,169 @@
+{
+  "version": "0.4",
+  "status": "passed",
+  "transport": "real_http",
+  "cases": [
+    {
+      "case": "same_request_reused_edit_invalidates_old_approval",
+      "passed": true,
+      "oracle": {
+        "passed": true,
+        "checks": 118,
+        "issues": [],
+        "counts": {
+          "accounts": 3,
+          "transactions": 5,
+          "receipts": 0,
+          "plans": 1,
+          "audit_events": 109
+        },
+        "source": "independent_sqlite_readonly_oracle",
+        "scope": "synthetic accounting, authorization, dependency evidence and audit invariants"
+      }
+    },
+    {
+      "case": "ambiguous_amount_or_floor_requires_version_bound_choice",
+      "passed": true,
+      "oracle": {
+        "passed": true,
+        "checks": 128,
+        "issues": [],
+        "counts": {
+          "accounts": 3,
+          "transactions": 5,
+          "receipts": 0,
+          "plans": 1,
+          "audit_events": 119
+        },
+        "source": "independent_sqlite_readonly_oracle",
+        "scope": "synthetic accounting, authorization, dependency evidence and audit invariants"
+      }
+    },
+    {
+      "case": "unsupported_compound_does_not_execute_partial_intent",
+      "passed": true,
+      "oracle": {
+        "passed": true,
+        "checks": 130,
+        "issues": [],
+        "counts": {
+          "accounts": 3,
+          "transactions": 5,
+          "receipts": 0,
+          "plans": 0,
+          "audit_events": 122
+        },
+        "source": "independent_sqlite_readonly_oracle",
+        "scope": "synthetic accounting, authorization, dependency evidence and audit invariants"
+      }
+    },
+    {
+      "case": "keep_membership_stops_cancel_and_blocks_dependent_payment",
+      "passed": true,
+      "oracle": {
+        "passed": true,
+        "checks": 146,
+        "issues": [],
+        "counts": {
+          "accounts": 3,
+          "transactions": 5,
+          "receipts": 1,
+          "plans": 1,
+          "audit_events": 131
+        },
+        "source": "independent_sqlite_readonly_oracle",
+        "scope": "synthetic accounting, authorization, dependency evidence and audit invariants"
+      }
+    },
+    {
+      "case": "funds_conflict_user_can_choose_later_request_without_auto_payment",
+      "passed": true,
+      "oracle": {
+        "passed": true,
+        "checks": 169,
+        "issues": [],
+        "counts": {
+          "accounts": 3,
+          "transactions": 7,
+          "receipts": 1,
+          "plans": 2,
+          "audit_events": 144
+        },
+        "source": "independent_sqlite_readonly_oracle",
+        "scope": "synthetic accounting, authorization, dependency evidence and audit invariants"
+      }
+    },
+    {
+      "case": "keep_and_cancel_conflict_applies_to_legacy_entrypoint",
+      "passed": true,
+      "oracle": {
+        "passed": true,
+        "checks": 161,
+        "issues": [],
+        "counts": {
+          "accounts": 3,
+          "transactions": 5,
+          "receipts": 0,
+          "plans": 1,
+          "audit_events": 151
+        },
+        "source": "independent_sqlite_readonly_oracle",
+        "scope": "synthetic accounting, authorization, dependency evidence and audit invariants"
+      }
+    },
+    {
+      "case": "interruption_retains_verified_payment_without_fake_refund",
+      "passed": true,
+      "oracle": {
+        "passed": true,
+        "checks": 182,
+        "issues": [],
+        "counts": {
+          "accounts": 3,
+          "transactions": 6,
+          "receipts": 1,
+          "plans": 1,
+          "audit_events": 159
+        },
+        "source": "independent_sqlite_readonly_oracle",
+        "scope": "synthetic accounting, authorization, dependency evidence and audit invariants"
+      }
+    },
+    {
+      "case": "savings_is_analysis_and_recommendations_only",
+      "passed": true,
+      "oracle": {
+        "passed": true,
+        "checks": 179,
+        "issues": [],
+        "counts": {
+          "accounts": 3,
+          "transactions": 5,
+          "receipts": 1,
+          "plans": 1,
+          "audit_events": 164
+        },
+        "source": "independent_sqlite_readonly_oracle",
+        "scope": "synthetic accounting, authorization, dependency evidence and audit invariants"
+      }
+    },
+    {
+      "case": "withdraw_unpaid_schedule_keeps_registration_receipt",
+      "passed": true,
+      "oracle": {
+        "passed": true,
+        "checks": 192,
+        "issues": [],
+        "counts": {
+          "accounts": 3,
+          "transactions": 5,
+          "receipts": 1,
+          "plans": 1,
+          "audit_events": 173
+        },
+        "source": "independent_sqlite_readonly_oracle",
+        "scope": "synthetic accounting, authorization, dependency evidence and audit invariants"
+      }
+    }
+  ]
+}

@@ -4,11 +4,14 @@ import secrets
 import hmac
 import httpx
 from sqlalchemy import select
-from contracts.models import ApprovalRequest, CandidatePlan, HandoffRecord, PlanProgress, RecipientClarification, TaskPlan, TaskStep
+from contracts.models import ApprovalRequest, CandidatePlan, HandoffRecord, InterruptionReview, PlanProgress, RecipientClarification, TaskPlan, TaskStep
 from pact.audit import record
 from pact.common import DomainError, digest, now, stamp, uid
 from pact.storage import ApprovalRow, Commitment, Guard, PlanRow
 from services.banking import service as bank
+from services.agent import templates
+from services.agent import coordination
+from services.sandbox import faults
 from services.policy.engine import enforce_constraints, evaluate
 
 
@@ -18,20 +21,19 @@ def get_plan(session, user, plan_id):
 
 
 def save(row, plan):
-    plan.schema_version = "0.2"
-    plan.progress = PlanProgress(completed=sum(s.status == "succeeded" for s in plan.steps), failed=sum(s.status == "failed" for s in plan.steps), pending_verification=sum(s.status == "pending_verification" for s in plan.steps), remaining=sum(s.status not in {"succeeded", "failed", "pending_verification"} for s in plan.steps))
+    plan.schema_version = "0.4"
+    done = {s.step_id for s in plan.steps if s.status == "succeeded"}
+    plan.ready_step_ids = [s.step_id for s in plan.steps if s.status in {"planned", "waiting_approval", "waiting_clarification"} and set(s.depends_on) <= done] if plan.status not in {"paused", "handed_off", "pending_verification", "partially_completed", "failed", "succeeded", "cancelled", "waiting_conflict"} else []
+    plan.progress = PlanProgress(completed=sum(s.status == "succeeded" for s in plan.steps), failed=sum(s.status == "failed" for s in plan.steps), pending_verification=sum(s.status == "pending_verification" for s in plan.steps), remaining=sum(s.status not in {"succeeded", "failed", "pending_verification", "cancelled"} for s in plan.steps), cancelled=sum(s.status == "cancelled" for s in plan.steps))
     row.document = plan.model_dump(mode="json")
 
 
 def expire_approvals(session, user, plan_id):
-    for a in session.scalars(select(ApprovalRow).where(ApprovalRow.user_id == user)):
-        if a.document["plan_id"] == plan_id and a.document["status"] in {"pending", "approved"}:
-            a.document = {**a.document, "status": "expired"}
-            a.challenge_hash, a.challenge_expires = None, None
+    coordination.invalidate(session, user, plan_id)
 
 
 def scope_hash(user, plan, step):
-    return digest({"user_id": user, "plan_id": plan.plan_id, "version": plan.version, "step_id": step.step_id, "minimum_balance_cents": plan.minimum_balance_cents, "action": step.action.model_dump(mode="json")})
+    return digest({"user_id": user, "plan_id": plan.plan_id, "version": plan.version, "step_id": step.step_id, "minimum_balance_cents": plan.minimum_balance_cents, "depends_on": step.depends_on, "action": step.action.model_dump(mode="json")})
 
 
 def resolve_target(session, user, plan, step):
@@ -58,9 +60,10 @@ def resolve_target(session, user, plan, step):
 
 
 def create_plan(session, user, candidate, planner="structured"):
+    candidate, metadata = templates.compile_candidate(candidate)
     for step in candidate.steps:
         bank.validate_action(session, user, step.action.model_dump(mode="json"))
-    plan = TaskPlan(plan_id=uid("plan"), title=candidate.title, planner=planner, minimum_balance_cents=candidate.minimum_balance_cents, created_at=stamp(), steps=[TaskStep(**s.model_dump()) for s in candidate.steps])
+    plan = TaskPlan(plan_id=uid("plan"), title=candidate.title, planner=planner, minimum_balance_cents=candidate.minimum_balance_cents, created_at=stamp(), steps=[TaskStep(**s.model_dump(), **metadata.get(s.step_id, {})) for s in candidate.steps])
     for step in plan.steps:
         resolve_target(session, user, plan, step)
     row = PlanRow(id=plan.plan_id, user_id=user, document={}, history=[])
@@ -130,7 +133,7 @@ def valid_pending_approval(session, user, approval_id):
     doc = approval.document
     _, plan = get_plan(session, user, doc["plan_id"])
     step = next((x for x in plan.steps if x.step_id == doc["step_id"]), None)
-    if plan.status in {"handed_off", "pending_verification", "partially_completed", "failed", "paused"} or doc["status"] != "pending" or datetime.fromisoformat(doc["expires_at"]) <= now() or plan.version != doc["plan_version"] or not step or step.approval_id != approval.id or digest(step.action.model_dump(mode="json")) != doc["action_hash"] or doc.get("scope_hash") != scope_hash(user, plan, step):
+    if plan.status in {"handed_off", "pending_verification", "partially_completed", "failed", "paused", "waiting_conflict", "cancelled"} or doc["status"] != "pending" or datetime.fromisoformat(doc["expires_at"]) <= now() or plan.version != doc["plan_version"] or not step or step.approval_id != approval.id or digest(step.action.model_dump(mode="json")) != doc["action_hash"] or doc.get("scope_hash") != scope_hash(user, plan, step):
         raise DomainError("STALE_APPROVAL", "审批已处理、过期或计划已变更")
     return approval
 
@@ -178,14 +181,18 @@ def execute_step(session, user, row, plan, step, command=None):
     cached = bank.owned(session, bank.ReceiptRow, step.receipt_id, user) if step.receipt_id else bank.find_receipt(session, user, key)
     if cached:
         return verify_step(session, user, plan, step, cached)
-    if plan.status in {"failed", "partially_completed", "paused", "pending_verification"}:
+    if plan.status in {"failed", "partially_completed", "paused", "pending_verification", "cancelled"} or step.status in {"cancelled", "paused"}:
         raise DomainError("PLAN_NOT_EXECUTABLE", "失败计划需重规划，暂停计划需显式恢复")
+    if plan.conflict_ids and action["tool"] not in coordination.GREEN:
+        raise DomainError("CONFLICT_REQUIRES_CHOICE", "冲突尚未由用户决定，不能执行相关操作")
     if any(next(x for x in plan.steps if x.step_id == d).status != "succeeded" for d in step.depends_on):
         raise DomainError("DEPENDENCIES_NOT_READY", "前置步骤尚未成功")
     check_guard(session, user)
     if not resolve_target(session, user, plan, step):
         return None
     action = step.action.model_dump(mode="json")
+    if action["tool"] == "cancel_subscription":
+        validate_cancel_query(session, user, plan, step)
     decision = assess(session, user, plan, step)
     step.risk_level = decision["level"]
     if decision.get("constraints"):
@@ -200,9 +207,15 @@ def execute_step(session, user, row, plan, step, command=None):
             save(row, plan)
             return None
     step.status, plan.status = "executing", "executing"
+    injected = faults.claim_post(session, user, plan, step)
+    if injected == "before_post_reject":
+        raise DomainError("INJECTED_REJECT", "测试环境注入明确拒绝；尚未变更业务状态")
     # All monetary mutations, approval consumption and receipts share the write transaction.
     with session.begin_nested():
-        receipt = bank.post_action(session, user, plan, step, key)
+        if injected == "after_mutation_rollback":
+            receipt = bank.post_action(session, user, plan, step, key, fail_after_mutation=True)
+        else:
+            receipt = bank.post_action(session, user, plan, step, key)
     if approval:
         approval.document = {**approval.document, "status": "consumed"}
     step.receipt_id = receipt.id
@@ -216,6 +229,8 @@ def execute_step(session, user, row, plan, step, command=None):
 def verify_step(session, user, plan, step, receipt):
     step.receipt_id = receipt.id
     try:
+        if faults.claim(session, user, plan, step, "verify_timeout"):
+            raise TimeoutError("sandbox verification timeout")
         result = bank.verify_receipt(session, user, receipt.id)
         if not result["verified"]:
             raise DomainError("RECEIPT_UNVERIFIED", "回执完整性或账务绑定未通过核验")
@@ -230,17 +245,40 @@ def verify_step(session, user, plan, step, receipt):
     return receipt
 
 
+def validate_cancel_query(session, user, plan, step):
+    preceding = templates.ancestors(plan.steps, step.step_id)
+    for query in plan.steps:
+        if query.step_id not in preceding or query.action.tool != "subscriptions" or query.action.account_id != step.action.account_id or query.status != "succeeded" or not query.receipt_id:
+            continue
+        view = bank.subscription_snapshot(session, user, step.action.account_id, query.receipt_id)
+        if any(s["subscription_id"] == step.action.subscription_id for s in view["items"]):
+            return
+    raise DomainError("SUBSCRIPTION_QUERY_REQUIRED", "取消前必须完成同账户已授权的订阅查询并核验目标", 403)
+
+
 def refresh_status(plan):
     if plan.status == "handed_off":
         return
     if any(s.status == "pending_verification" for s in plan.steps):
         plan.status = "pending_verification"
+    elif plan.interruption and any(s.status in {"cancelled", "paused"} for s in plan.steps):
+        plan.status = "paused" if plan.interruption.blocked_step_ids else "partially_completed" if any(s.status == "succeeded" for s in plan.steps) else "cancelled"
+    elif plan.conflict_ids:
+        plan.status = "waiting_conflict"
     elif any(s.status == "failed" for s in plan.steps):
         plan.status = "partially_completed" if any(s.status == "succeeded" for s in plan.steps) else "failed"
     elif all(s.status == "succeeded" for s in plan.steps):
         plan.status = "succeeded"
+    elif plan.status == "paused":
+        return
+    elif any(s.status == "waiting_clarification" for s in plan.steps):
+        plan.status = "waiting_clarification"
+    elif any(s.status == "waiting_approval" for s in plan.steps):
+        plan.status = "waiting_approval"
     elif plan.status in {"executing", "pending_verification"}:
         plan.status = "planned"
+    if plan.status in {"succeeded", "failed", "partially_completed", "cancelled", "paused"}:
+        plan.activated_until = None
 
 
 def run(session, user, plan_id, resume=False, command=None):
@@ -272,31 +310,46 @@ def run(session, user, plan_id, resume=False, command=None):
             receipt = execute_step(session, user, row, plan, step, command)
             return {"receipt": receipt.document, "plan": plan.model_dump(mode="json")}
         return plan
+    if plan.status == "cancelled":
+        raise DomainError("PLAN_CANCELLED", "任务已停止，请明确新请求后重新规划")
     if plan.status in {"failed", "partially_completed"}:
         raise DomainError("REPLAN_REQUIRED", "计划已失败，请根据最新资金约束重规划")
     if plan.status == "paused" and not resume:
         return plan
     check_guard(session, user)
     if resume:
+        if plan.interruption and plan.interruption.blocked_step_ids:
+            raise DomainError("REPLAN_REQUIRED", "前置条件已被用户停止，请明确剩余动作后重规划")
         plan.status = "planned"
     if command and not any(s.step_id == command.step_id for s in plan.steps):
         raise DomainError("NOT_FOUND", "步骤不存在", 404)
+    coordination.check(session, user, row, plan)
+    if command and plan.conflict_ids:
+        requested = next(s for s in plan.steps if s.step_id == command.step_id)
+        if requested.action.tool not in coordination.GREEN:
+            save(row, plan)
+            return {"receipt": None, "plan": plan.model_dump(mode="json")}
+    attempted = set()
     for _ in range(12):
         done = {s.step_id for s in plan.steps if s.status == "succeeded"}
-        step = next((s for s in plan.steps if s.status in {"planned", "waiting_approval", "waiting_clarification"} and set(s.depends_on) <= done and (not command or s.step_id == command.step_id)), None)
+        step = next((s for s in plan.steps if s.step_id not in attempted and s.status in {"planned", "waiting_approval", "waiting_clarification"} and set(s.depends_on) <= done and (not plan.conflict_ids or s.action.tool in coordination.GREEN) and (not command or s.step_id == command.step_id)), None)
         if not step:
             if command:
                 raise DomainError("DEPENDENCIES_NOT_READY", "请求的步骤尚不能执行")
             break
+        attempted.add(step.step_id)
         try:
             result = execute_step(session, user, row, plan, step, command)
         except DomainError as error:
             step.status, step.error, plan.status = "failed", error.as_dict(), "failed"
+            if plan.conflict_ids:
+                coordination.close_for_plan(session, user, plan_id)
+                plan.conflict_ids, plan.activated_until = [], None
             if error.code != "APPROVAL_REJECTED":
                 fail_guard(session, user)
             record(session, user, "step.failed", plan.plan_id, {"step_id": step.step_id, "code": error.code})
             break
-        if result is None or command:
+        if plan.status == "pending_verification" or command:
             break
     refresh_status(plan)
     save(row, plan)
@@ -313,7 +366,17 @@ def replan(session, user, plan_id, candidate, planner):
         raise DomainError("RESOLUTION_REQUIRED", "先完成原交易核验或交还人工接管，不能重规划付款")
     if old.status == "succeeded":
         raise DomainError("PLAN_COMPLETE", "已完成计划不能重规划，请新建请求")
+    candidate, metadata = templates.compile_candidate(candidate)
     for s in candidate.steps:
+        # Normalize a unique name before comparing with retained executed actions.
+        # Otherwise recipient_query and the saved recipient_id hash differently.
+        if s.action.tool in {"transfer", "schedule_transfer"} and s.action.recipient_query:
+            matches = bank.recipient_matches(session, user, s.action.model_dump(mode="json"))
+            if len(matches) == 1:
+                action = s.action.model_dump(mode="json")
+                action.pop("recipient_query", None)
+                action["recipient_id"] = matches[0]["recipient_id"]
+                s.action = type(s.action).model_validate(action)
         bank.validate_action(session, user, s.action.model_dump(mode="json"))
     retained = [s for s in old.steps if s.status == "succeeded"]
     for step in retained:
@@ -326,15 +389,17 @@ def replan(session, user, plan_id, candidate, planner):
         if digest(step.action.model_dump(mode="json")) in retained_by_hash:
             continue
         deps = [mapping[d] for d in step.depends_on] or [s.step_id for s in retained]
-        new.append(TaskStep(step_id=mapping[step.step_id], action=step.action, depends_on=list(dict.fromkeys(deps))))
+        new.append(TaskStep(step_id=mapping[step.step_id], action=step.action, depends_on=list(dict.fromkeys(deps)), **metadata.get(step.step_id, {})))
     if not new:
         raise DomainError("NOTHING_TO_REPLAN", "新请求只包含已核验完成的动作")
     CandidatePlan(title=candidate.title, steps=[{"step_id": s.step_id, "depends_on": s.depends_on, "action": s.action} for s in retained + new])
     row.history = row.history + [old.model_dump(mode="json")]
+    coordination.close_for_plan(session, user, plan_id)
     expire_approvals(session, user, plan_id)
     old.version += 1
     old.status, old.steps, old.title, old.planner = "planned", retained + new, candidate.title, planner
     old.minimum_balance_cents = max(old.minimum_balance_cents, candidate.minimum_balance_cents)
+    old.conflict_ids, old.interruption, old.activated_until = [], None, None
     for step in old.steps:
         if step.status != "succeeded":
             resolve_target(session, user, old, step)
@@ -361,9 +426,11 @@ def select_recipient(session, user, plan_id, command):
     step.action = type(step.action).model_validate(action)
     bank.validate_action(session, user, action)
     row.history = row.history + [previous]
+    coordination.close_for_plan(session, user, plan_id)
     expire_approvals(session, user, plan_id)
     plan.version += 1
     plan.status = "planned"
+    plan.conflict_ids, plan.activated_until = [], None
     for item in plan.steps:
         if item.status != "succeeded":
             item.clarification, item.approval_id, item.status = None, None, "planned"
@@ -395,9 +462,105 @@ def handoff_plan(session, user, plan_id, command):
         raise DomainError("HANDOFF_NOT_ALLOWED", "版本已改变、计划已完成或已接管")
     plan.handoff = HandoffRecord(handoff_id=uid("handoff"), requested_by=user, reason=command.reason, created_at=stamp(), prior_status=plan.status)
     plan.status = "handed_off"
+    coordination.close_for_plan(session, user, plan_id)
+    plan.conflict_ids, plan.activated_until = [], None
     expire_approvals(session, user, plan_id)
     save(row, plan)
     record(session, user, "handoff.requested", plan_id, plan.handoff.model_dump(mode="json"))
+    return plan
+
+
+def pause_plan(session, user, plan_id):
+    row, plan = get_plan(session, user, plan_id)
+    if plan.status in {"succeeded", "failed", "partially_completed", "pending_verification", "handed_off", "cancelled"}:
+        raise DomainError("TERMINAL_PLAN", "此状态不能暂停，需先核验、重规划或人工处理")
+    coordination.close_for_plan(session, user, plan_id)
+    expire_approvals(session, user, plan_id)
+    plan.status, plan.activated_until, plan.conflict_ids = "paused", None, []
+    save(row, plan)
+    record(session, user, "plan.paused", plan_id)
+    return plan
+
+
+def interrupt(session, user, plan_id, command):
+    row, plan = get_plan(session, user, plan_id)
+    if command.plan_version != plan.version or plan.status == "handed_off":
+        raise DomainError("INTERRUPTION_STALE", "版本已变化或人工接管中")
+    if command.step_id and not any(s.step_id == command.step_id for s in plan.steps):
+        raise DomainError("NOT_FOUND", "中断目标不存在", 404)
+    retained, unknown, compensation = [], [], []
+    # Preserve verified facts, even when a client was interrupted before seeing them.
+    for step in plan.steps:
+        receipt = session.get(bank.ReceiptRow, step.receipt_id) if step.receipt_id else bank.find_receipt(session, user, bank.execution_key(plan, step))
+        if receipt:
+            verify_step(session, user, plan, step, receipt)
+            if step.status == "pending_verification":
+                unknown.append(receipt.id)
+            else:
+                retained.append(receipt.id)
+                if step.action.tool in {"transfer", "cancel_subscription", "schedule_transfer"}:
+                    compensation.append({"step_id": step.step_id, "operation": step.action.tool, "receipt_id": receipt.id, "status": "retained", "message": "已发生动作保留；付款不自动退款，已取消代扣不自动恢复；定时登记须另行取消承诺或人工处理"})
+    target_ids = {command.step_id} if command.step_id else {s.step_id for s in plan.steps}
+    if command.step_id:
+        target = next(s for s in plan.steps if s.step_id == command.step_id)
+        if target.action.tool == "cancel_subscription":
+            target_ids.update(s.step_id for s in plan.steps if s.action.tool == "subscriptions" and s.template_instance_id == target.template_instance_id)
+    for step in plan.steps:
+        if step.step_id in target_ids and step.status == "succeeded" and step.action.tool == "schedule_transfer":
+            withdrawal = bank.withdraw_schedule(session, user, step.receipt_id)
+            compensation.append({"step_id": step.step_id, "operation": "withdraw_schedule", **withdrawal})
+            if withdrawal["withdrawn"] and withdrawal["execution_plan_id"] and withdrawal["execution_plan_id"] != plan_id:
+                due_row, due_plan = get_plan(session, user, withdrawal["execution_plan_id"])
+                interrupt(session, user, due_plan.plan_id, type(command)(plan_version=due_plan.version, reason="用户撤销原定时安排"))
+            record(session, user, "schedule.withdrawal_review", withdrawal["commitment_id"], withdrawal)
+    downstream = {s.step_id for s in plan.steps if command.step_id and command.step_id in templates.ancestors(plan.steps, s.step_id)}
+    cancelled, blocked = [], []
+    for step in plan.steps:
+        if step.status in {"succeeded", "pending_verification"}:
+            continue
+        if step.step_id in target_ids:
+            step.status = "cancelled"
+            cancelled.append(step.step_id)
+        elif step.step_id in downstream:
+            step.status = "paused"
+            blocked.append(step.step_id)
+    coordination.close_for_plan(session, user, plan_id)
+    expire_approvals(session, user, plan_id)
+    plan.conflict_ids, plan.activated_until = [], None
+    plan.interruption = InterruptionReview(reason=command.reason, created_at=stamp(), cancelled_step_ids=cancelled, blocked_step_ids=blocked, retained_receipt_ids=retained, unknown_receipt_ids=unknown, compensation_items=compensation, message="已检查已发生动作。未执行部分已停止或等待重规划；已发生交易不撤回，结果不明须先核验。")
+    refresh_status(plan)
+    save(row, plan)
+    record(session, user, "plan.interrupted", plan_id, plan.interruption.model_dump())
+    return plan
+
+
+def amend(session, user, plan_id, step_id, field, value):
+    row, plan = get_plan(session, user, plan_id)
+    if plan.status in {"handed_off", "pending_verification", "succeeded"} or any(s.status == "pending_verification" for s in plan.steps) or (plan.interruption and (plan.interruption.cancelled_step_ids or plan.interruption.blocked_step_ids)):
+        raise DomainError("AMENDMENT_NOT_ALLOWED", "已完成或待核验的动作不能当作未执行修改")
+    target = next((s for s in plan.steps if s.step_id == step_id), None)
+    if field == "amount_cents" and (not target or target.action.tool not in {"transfer", "schedule_transfer"} or target.receipt_id):
+        raise DomainError("AMENDMENT_NOT_ALLOWED", "只能修改尚未执行的付款金额")
+    previous = plan.model_dump(mode="json")
+    if field == "amount_cents":
+        action = target.action.model_dump(mode="json")
+        action["amount_cents"] = value
+        target.action = type(target.action).model_validate(action)
+    elif field == "minimum_balance_cents":
+        CandidatePlan(title=plan.title, minimum_balance_cents=value, steps=[{"step_id": s.step_id, "depends_on": s.depends_on, "action": s.action} for s in plan.steps])
+        plan.minimum_balance_cents = value
+    else:
+        raise DomainError("AMENDMENT_NOT_ALLOWED", "该字段不可通过会话修改", 422)
+    coordination.close_for_plan(session, user, plan_id)
+    row.history = row.history + [previous]
+    expire_approvals(session, user, plan_id)
+    plan.version += 1
+    plan.status, plan.conflict_ids, plan.interruption, plan.activated_until = "planned", [], None, None
+    for step in plan.steps:
+        if step.status != "succeeded":
+            step.status, step.approval_id, step.error, step.clarification = "planned", None, None, None
+    save(row, plan)
+    record(session, user, "plan.amended", plan_id, {"step_id": step_id, "field": field, "value": value, "version": plan.version})
     return plan
 
 
