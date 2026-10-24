@@ -1,9 +1,3 @@
-# A · Agent
+# Agent 模块
 
-负责人：用户本人 / @ThreshoLdnnis。
-
-预留职责：自然语言意图解析、严格结构化候选 TaskPlan、DAG 编排、暂停恢复、失败后重规划。
-
-先参与 [共享协议评审](../../contracts/README.md)，再在自己的任务分支开发。模型不能直接执行银行操作或自行认定成功。金额、权限、幂等、账务与回执由 B/C 的服务端边界保证。
-
-当前没有实现代码；不要以目录存在作为功能完成证据。
+planner.py实现规则规划与可选Ollama严格JSON候选适配；engine.py实现持久化DAG、授权等待、暂停恢复、重规划和回执核验。模型候选不能产生风险等级或执行状态。见docs/ARCHITECTURE.md和docs/API.md。

@@ -1,0 +1,12 @@
+{
+  "workflow": "analysis -> cancellation -> transfer",
+  "status": "passed",
+  "plan_id": "plan_7e5c0fac5d3547b5803fa90b3aa842a5",
+  "receipt_ids": [
+    "rec_d7c7dd0a03b944f4829ca6526ba8a52c",
+    "rec_4ad7c5cea977493ba937cf23f02eb949",
+    "rec_867e59ada05548dab20a5ded1ab35118"
+  ],
+  "balance_delta_cents": -50000,
+  "verified": true
+}

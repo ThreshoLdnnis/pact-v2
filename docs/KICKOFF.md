@@ -1,5 +1,7 @@
 # 开工工作项
 
+阶段更新：用户已明确要求完整实施、不再按分工限制本次工作。当前MVP实现与证据见README、docs/ARCHITECTURE.md、docs/SECURITY_SELF_ASSESSMENT.md和reports/。下表保留原始四人任务边界，便于后续协作，不表示模块仍未实现。
+
 这里只准备任务边界，不代替成员开展全部实现。共享协议未评审前，各模块可以做本地探索，但不要把自行假设的公共接口合入主干。
 
 GitHub 已建立：[共享评审 #1](https://github.com/ThreshoLdnnis/pact-v2/issues/1)、[A #2](https://github.com/ThreshoLdnnis/pact-v2/issues/2)、[B #3](https://github.com/ThreshoLdnnis/pact-v2/issues/3)、[C #4](https://github.com/ThreshoLdnnis/pact-v2/issues/4)、[D #5](https://github.com/ThreshoLdnnis/pact-v2/issues/5)。#1/#2 已分配 A；B/C 邀请已发送但待本人接受，D 待账号，因此 #3/#4/#5 暂不设 GitHub assignee，正文保留明确角色。

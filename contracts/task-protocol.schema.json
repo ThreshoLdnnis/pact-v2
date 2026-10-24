@@ -1,0 +1,679 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PACT Task Protocol 0.1",
+  "$defs": {
+    "CancelAction": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Account Id",
+          "type": "string"
+        },
+        "tool": {
+          "const": "cancel_subscription",
+          "title": "Tool",
+          "type": "string"
+        },
+        "subscription_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Subscription Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "account_id",
+        "tool",
+        "subscription_id"
+      ],
+      "title": "CancelAction",
+      "type": "object"
+    },
+    "CandidateStep": {
+      "additionalProperties": false,
+      "properties": {
+        "step_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Step Id",
+          "type": "string"
+        },
+        "depends_on": {
+          "items": {
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "type": "string"
+          },
+          "maxItems": 12,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "action": {
+          "discriminator": {
+            "mapping": {
+              "analyze_bills": "#/$defs/ReadAction",
+              "balance": "#/$defs/ReadAction",
+              "cancel_subscription": "#/$defs/CancelAction",
+              "commitments": "#/$defs/ReadAction",
+              "recipients": "#/$defs/ReadAction",
+              "schedule_transfer": "#/$defs/ScheduleAction",
+              "subscriptions": "#/$defs/ReadAction",
+              "transactions": "#/$defs/ReadAction",
+              "transfer": "#/$defs/TransferAction"
+            },
+            "propertyName": "tool"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ReadAction"
+            },
+            {
+              "$ref": "#/$defs/TransferAction"
+            },
+            {
+              "$ref": "#/$defs/ScheduleAction"
+            },
+            {
+              "$ref": "#/$defs/CancelAction"
+            }
+          ],
+          "title": "Action"
+        }
+      },
+      "required": [
+        "step_id",
+        "action"
+      ],
+      "title": "CandidateStep",
+      "type": "object"
+    },
+    "ReadAction": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Account Id",
+          "type": "string"
+        },
+        "tool": {
+          "enum": [
+            "balance",
+            "transactions",
+            "analyze_bills",
+            "subscriptions",
+            "commitments",
+            "recipients"
+          ],
+          "title": "Tool",
+          "type": "string"
+        },
+        "period": {
+          "default": "month",
+          "enum": [
+            "month",
+            "30d"
+          ],
+          "title": "Period",
+          "type": "string"
+        }
+      },
+      "required": [
+        "account_id",
+        "tool"
+      ],
+      "title": "ReadAction",
+      "type": "object"
+    },
+    "ScheduleAction": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Account Id",
+          "type": "string"
+        },
+        "tool": {
+          "const": "schedule_transfer",
+          "title": "Tool",
+          "type": "string"
+        },
+        "recipient_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Recipient Id",
+          "type": "string"
+        },
+        "amount_cents": {
+          "maximum": 100000000,
+          "minimum": 1,
+          "title": "Amount Cents",
+          "type": "integer"
+        },
+        "due_at": {
+          "format": "date-time",
+          "title": "Due At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "account_id",
+        "tool",
+        "recipient_id",
+        "amount_cents",
+        "due_at"
+      ],
+      "title": "ScheduleAction",
+      "type": "object"
+    },
+    "TransferAction": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Account Id",
+          "type": "string"
+        },
+        "tool": {
+          "const": "transfer",
+          "title": "Tool",
+          "type": "string"
+        },
+        "recipient_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Recipient Id",
+          "type": "string"
+        },
+        "amount_cents": {
+          "maximum": 100000000,
+          "minimum": 1,
+          "title": "Amount Cents",
+          "type": "integer"
+        },
+        "commitment_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Commitment Id"
+        }
+      },
+      "required": [
+        "account_id",
+        "tool",
+        "recipient_id",
+        "amount_cents"
+      ],
+      "title": "TransferAction",
+      "type": "object"
+    },
+    "CandidatePlan": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "minimum_balance_cents": {
+          "default": 0,
+          "maximum": 100000000,
+          "minimum": 0,
+          "title": "Minimum Balance Cents",
+          "type": "integer"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/CandidateStep"
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "title",
+        "steps"
+      ],
+      "title": "CandidatePlan",
+      "type": "object"
+    },
+    "TaskStep": {
+      "additionalProperties": false,
+      "properties": {
+        "step_id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Step Id",
+          "type": "string"
+        },
+        "depends_on": {
+          "items": {
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "type": "string"
+          },
+          "maxItems": 12,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "action": {
+          "discriminator": {
+            "mapping": {
+              "analyze_bills": "#/$defs/ReadAction",
+              "balance": "#/$defs/ReadAction",
+              "cancel_subscription": "#/$defs/CancelAction",
+              "commitments": "#/$defs/ReadAction",
+              "recipients": "#/$defs/ReadAction",
+              "schedule_transfer": "#/$defs/ScheduleAction",
+              "subscriptions": "#/$defs/ReadAction",
+              "transactions": "#/$defs/ReadAction",
+              "transfer": "#/$defs/TransferAction"
+            },
+            "propertyName": "tool"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ReadAction"
+            },
+            {
+              "$ref": "#/$defs/TransferAction"
+            },
+            {
+              "$ref": "#/$defs/ScheduleAction"
+            },
+            {
+              "$ref": "#/$defs/CancelAction"
+            }
+          ],
+          "title": "Action"
+        },
+        "status": {
+          "default": "planned",
+          "enum": [
+            "planned",
+            "waiting_approval",
+            "executing",
+            "succeeded",
+            "failed",
+            "paused"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "risk_level": {
+          "anyOf": [
+            {
+              "enum": [
+                "green",
+                "yellow",
+                "red"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Risk Level"
+        },
+        "approval_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval Id"
+        },
+        "receipt_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Receipt Id"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Result"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        }
+      },
+      "required": [
+        "step_id",
+        "action"
+      ],
+      "title": "TaskStep",
+      "type": "object"
+    },
+    "TaskPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "0.1",
+          "default": "0.1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "plan_id": {
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "version": {
+          "default": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "planner": {
+          "enum": [
+            "rules",
+            "ollama",
+            "structured",
+            "schedule"
+          ],
+          "title": "Planner",
+          "type": "string"
+        },
+        "minimum_balance_cents": {
+          "default": 0,
+          "title": "Minimum Balance Cents",
+          "type": "integer"
+        },
+        "status": {
+          "default": "planned",
+          "enum": [
+            "planned",
+            "waiting_approval",
+            "executing",
+            "succeeded",
+            "failed",
+            "paused"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/TaskStep"
+          },
+          "title": "Steps",
+          "type": "array"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_id",
+        "title",
+        "planner",
+        "steps",
+        "created_at"
+      ],
+      "title": "TaskPlan",
+      "type": "object"
+    },
+    "ApprovalRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "approval_id": {
+          "title": "Approval Id",
+          "type": "string"
+        },
+        "plan_id": {
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "plan_version": {
+          "title": "Plan Version",
+          "type": "integer"
+        },
+        "step_id": {
+          "title": "Step Id",
+          "type": "string"
+        },
+        "action_hash": {
+          "title": "Action Hash",
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            "yellow",
+            "red"
+          ],
+          "title": "Level",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "approved",
+            "rejected",
+            "consumed",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "expires_at": {
+          "title": "Expires At",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "action": {
+          "additionalProperties": true,
+          "title": "Action",
+          "type": "object"
+        }
+      },
+      "required": [
+        "approval_id",
+        "plan_id",
+        "plan_version",
+        "step_id",
+        "action_hash",
+        "level",
+        "status",
+        "expires_at",
+        "reason",
+        "action"
+      ],
+      "title": "ApprovalRequest",
+      "type": "object"
+    },
+    "ExecutionReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "receipt_id": {
+          "title": "Receipt Id",
+          "type": "string"
+        },
+        "plan_id": {
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "plan_version": {
+          "title": "Plan Version",
+          "type": "integer"
+        },
+        "step_id": {
+          "title": "Step Id",
+          "type": "string"
+        },
+        "action_hash": {
+          "title": "Action Hash",
+          "type": "string"
+        },
+        "operation": {
+          "title": "Operation",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "scheduled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "transaction_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transaction Id"
+        },
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "receipt_id",
+        "plan_id",
+        "plan_version",
+        "step_id",
+        "action_hash",
+        "operation",
+        "status",
+        "data",
+        "created_at"
+      ],
+      "title": "ExecutionReceipt",
+      "type": "object"
+    },
+    "BankingCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "plan_id": {
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "plan_version": {
+          "title": "Plan Version",
+          "type": "integer"
+        },
+        "step_id": {
+          "title": "Step Id",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Idempotency Key",
+          "type": "string"
+        },
+        "action": {
+          "discriminator": {
+            "mapping": {
+              "analyze_bills": "#/$defs/ReadAction",
+              "balance": "#/$defs/ReadAction",
+              "cancel_subscription": "#/$defs/CancelAction",
+              "commitments": "#/$defs/ReadAction",
+              "recipients": "#/$defs/ReadAction",
+              "schedule_transfer": "#/$defs/ScheduleAction",
+              "subscriptions": "#/$defs/ReadAction",
+              "transactions": "#/$defs/ReadAction",
+              "transfer": "#/$defs/TransferAction"
+            },
+            "propertyName": "tool"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ReadAction"
+            },
+            {
+              "$ref": "#/$defs/TransferAction"
+            },
+            {
+              "$ref": "#/$defs/ScheduleAction"
+            },
+            {
+              "$ref": "#/$defs/CancelAction"
+            }
+          ],
+          "title": "Action"
+        }
+      },
+      "required": [
+        "plan_id",
+        "plan_version",
+        "step_id",
+        "idempotency_key",
+        "action"
+      ],
+      "title": "BankingCommand",
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/CandidatePlan"
+    },
+    {
+      "$ref": "#/$defs/TaskPlan"
+    },
+    {
+      "$ref": "#/$defs/TaskStep"
+    },
+    {
+      "$ref": "#/$defs/ApprovalRequest"
+    },
+    {
+      "$ref": "#/$defs/ExecutionReceipt"
+    },
+    {
+      "$ref": "#/$defs/BankingCommand"
+    }
+  ]
+}

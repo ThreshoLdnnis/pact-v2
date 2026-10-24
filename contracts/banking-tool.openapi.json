@@ -1,0 +1,1558 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "PACT V2.0 Sandbox",
+    "description": "仅合成数据的银行 Agent MVP。候选计划与银行工具 API 分离；模型不具备执行权限。",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/banking/accounts": {
+      "get": {
+        "tags": [
+          "Banking Tool API"
+        ],
+        "summary": "Accounts",
+        "operationId": "accounts_api_v1_banking_accounts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/banking/accounts/{account_id}/{resource}": {
+      "get": {
+        "tags": [
+          "Banking Tool API"
+        ],
+        "summary": "Banking Read",
+        "operationId": "banking_read_api_v1_banking_accounts__account_id___resource__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Account Id"
+            }
+          },
+          {
+            "name": "resource",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resource"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/BalanceView"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TransactionList"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RecipientList"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SubscriptionList"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommitmentList"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BillsView"
+                    }
+                  ],
+                  "title": "Response Banking Read Api V1 Banking Accounts  Account Id   Resource  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/banking/execute": {
+      "post": {
+        "tags": [
+          "Banking Tool API"
+        ],
+        "summary": "Execute",
+        "operationId": "execute_api_v1_banking_execute_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankingCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankingExecutionResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/banking/receipts/{receipt_id}": {
+      "get": {
+        "tags": [
+          "Banking Tool API"
+        ],
+        "summary": "Receipt",
+        "operationId": "receipt_api_v1_banking_receipts__receipt_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "receipt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Receipt Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionReceipt"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/banking/receipts/{receipt_id}/verify": {
+      "get": {
+        "tags": [
+          "Banking Tool API"
+        ],
+        "summary": "Verify",
+        "operationId": "verify_api_v1_banking_receipts__receipt_id__verify_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "receipt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Receipt Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptVerification"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/banking/reconciliation": {
+      "get": {
+        "tags": [
+          "Banking Tool API"
+        ],
+        "summary": "Reconciliation",
+        "operationId": "reconciliation_api_v1_banking_reconciliation_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/banking/commitment-graph": {
+      "get": {
+        "tags": [
+          "Banking Tool API"
+        ],
+        "summary": "Graph",
+        "operationId": "graph_api_v1_banking_commitment_graph_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/banking/schedules/prepare-due": {
+      "post": {
+        "tags": [
+          "Banking Tool API"
+        ],
+        "summary": "Due",
+        "operationId": "due_api_v1_banking_schedules_prepare_due_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccountList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AccountView"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "AccountList"
+      },
+      "AccountView": {
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "title": "Account Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "currency": {
+            "type": "string",
+            "const": "CNY",
+            "title": "Currency"
+          },
+          "balance_cents": {
+            "type": "integer",
+            "title": "Balance Cents"
+          },
+          "minimum_balance_cents": {
+            "type": "integer",
+            "title": "Minimum Balance Cents"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "account_id",
+          "name",
+          "currency",
+          "balance_cents",
+          "minimum_balance_cents"
+        ],
+        "title": "AccountView"
+      },
+      "ApprovalDecision": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "reject"
+            ],
+            "title": "Decision"
+          },
+          "challenge_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Challenge Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "ApprovalDecision"
+      },
+      "BalanceView": {
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "title": "Account Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "currency": {
+            "type": "string",
+            "const": "CNY",
+            "title": "Currency"
+          },
+          "balance_cents": {
+            "type": "integer",
+            "title": "Balance Cents"
+          },
+          "minimum_balance_cents": {
+            "type": "integer",
+            "title": "Minimum Balance Cents"
+          },
+          "constraints": {
+            "$ref": "#/components/schemas/ConstraintSnapshot"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "account_id",
+          "name",
+          "currency",
+          "balance_cents",
+          "minimum_balance_cents",
+          "constraints"
+        ],
+        "title": "BalanceView"
+      },
+      "BankingCommand": {
+        "properties": {
+          "plan_id": {
+            "type": "string",
+            "title": "Plan Id"
+          },
+          "plan_version": {
+            "type": "integer",
+            "title": "Plan Version"
+          },
+          "step_id": {
+            "type": "string",
+            "title": "Step Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "action": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReadAction"
+              },
+              {
+                "$ref": "#/components/schemas/TransferAction"
+              },
+              {
+                "$ref": "#/components/schemas/ScheduleAction"
+              },
+              {
+                "$ref": "#/components/schemas/CancelAction"
+              }
+            ],
+            "title": "Action",
+            "discriminator": {
+              "propertyName": "tool",
+              "mapping": {
+                "analyze_bills": "#/components/schemas/ReadAction",
+                "balance": "#/components/schemas/ReadAction",
+                "cancel_subscription": "#/components/schemas/CancelAction",
+                "commitments": "#/components/schemas/ReadAction",
+                "recipients": "#/components/schemas/ReadAction",
+                "schedule_transfer": "#/components/schemas/ScheduleAction",
+                "subscriptions": "#/components/schemas/ReadAction",
+                "transactions": "#/components/schemas/ReadAction",
+                "transfer": "#/components/schemas/TransferAction"
+              }
+            }
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "plan_id",
+          "plan_version",
+          "step_id",
+          "idempotency_key",
+          "action"
+        ],
+        "title": "BankingCommand"
+      },
+      "BankingExecutionResult": {
+        "properties": {
+          "receipt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionReceipt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plan": {
+            "$ref": "#/components/schemas/TaskPlan"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "receipt",
+          "plan"
+        ],
+        "title": "BankingExecutionResult"
+      },
+      "BillsView": {
+        "properties": {
+          "period_start": {
+            "type": "string",
+            "title": "Period Start"
+          },
+          "period_end": {
+            "type": "string",
+            "title": "Period End"
+          },
+          "timezone": {
+            "type": "string",
+            "const": "Asia/Shanghai",
+            "title": "Timezone"
+          },
+          "income_cents": {
+            "type": "integer",
+            "title": "Income Cents"
+          },
+          "expense_cents": {
+            "type": "integer",
+            "title": "Expense Cents"
+          },
+          "transfer_out_cents": {
+            "type": "integer",
+            "title": "Transfer Out Cents"
+          },
+          "categories": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Categories"
+          },
+          "transaction_count": {
+            "type": "integer",
+            "title": "Transaction Count"
+          },
+          "source": {
+            "type": "string",
+            "const": "banking_ledger",
+            "title": "Source"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "period_start",
+          "period_end",
+          "timezone",
+          "income_cents",
+          "expense_cents",
+          "transfer_out_cents",
+          "categories",
+          "transaction_count",
+          "source"
+        ],
+        "title": "BillsView"
+      },
+      "CancelAction": {
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Account Id"
+          },
+          "tool": {
+            "type": "string",
+            "const": "cancel_subscription",
+            "title": "Tool"
+          },
+          "subscription_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Subscription Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "account_id",
+          "tool",
+          "subscription_id"
+        ],
+        "title": "CancelAction"
+      },
+      "CandidatePlan": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "minimum_balance_cents": {
+            "type": "integer",
+            "maximum": 100000000.0,
+            "minimum": 0.0,
+            "title": "Minimum Balance Cents",
+            "default": 0
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateStep"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Steps"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "steps"
+        ],
+        "title": "CandidatePlan"
+      },
+      "CandidateStep": {
+        "properties": {
+          "step_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Step Id"
+          },
+          "depends_on": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Depends On"
+          },
+          "action": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReadAction"
+              },
+              {
+                "$ref": "#/components/schemas/TransferAction"
+              },
+              {
+                "$ref": "#/components/schemas/ScheduleAction"
+              },
+              {
+                "$ref": "#/components/schemas/CancelAction"
+              }
+            ],
+            "title": "Action",
+            "discriminator": {
+              "propertyName": "tool",
+              "mapping": {
+                "analyze_bills": "#/components/schemas/ReadAction",
+                "balance": "#/components/schemas/ReadAction",
+                "cancel_subscription": "#/components/schemas/CancelAction",
+                "commitments": "#/components/schemas/ReadAction",
+                "recipients": "#/components/schemas/ReadAction",
+                "schedule_transfer": "#/components/schemas/ScheduleAction",
+                "subscriptions": "#/components/schemas/ReadAction",
+                "transactions": "#/components/schemas/ReadAction",
+                "transfer": "#/components/schemas/TransferAction"
+              }
+            }
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "step_id",
+          "action"
+        ],
+        "title": "CandidateStep"
+      },
+      "CommitmentList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CommitmentView"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "constraints": {
+            "$ref": "#/components/schemas/ConstraintSnapshot"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "constraints"
+        ],
+        "title": "CommitmentList"
+      },
+      "CommitmentView": {
+        "properties": {
+          "commitment_id": {
+            "type": "string",
+            "title": "Commitment Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "account_id": {
+            "type": "string",
+            "title": "Account Id"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "title": "Amount Cents"
+          },
+          "due_at": {
+            "type": "string",
+            "title": "Due At"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "cancelled",
+              "fulfilled"
+            ],
+            "title": "Status"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "execution_plan_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Plan Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "commitment_id",
+          "name",
+          "account_id",
+          "amount_cents",
+          "due_at",
+          "status",
+          "kind",
+          "execution_plan_id"
+        ],
+        "title": "CommitmentView"
+      },
+      "ConstraintSnapshot": {
+        "properties": {
+          "balance_cents": {
+            "type": "integer",
+            "title": "Balance Cents"
+          },
+          "minimum_balance_cents": {
+            "type": "integer",
+            "title": "Minimum Balance Cents"
+          },
+          "committed_cents": {
+            "type": "integer",
+            "title": "Committed Cents"
+          },
+          "spendable_cents": {
+            "type": "integer",
+            "title": "Spendable Cents"
+          },
+          "requested_cents": {
+            "type": "integer",
+            "title": "Requested Cents"
+          },
+          "remaining_after_cents": {
+            "type": "integer",
+            "title": "Remaining After Cents"
+          },
+          "allowed": {
+            "type": "boolean",
+            "title": "Allowed"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "balance_cents",
+          "minimum_balance_cents",
+          "committed_cents",
+          "spendable_cents",
+          "requested_cents",
+          "remaining_after_cents",
+          "allowed"
+        ],
+        "title": "ConstraintSnapshot"
+      },
+      "DemoLogin": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "enum": [
+              "alice",
+              "bob"
+            ],
+            "title": "User Id",
+            "default": "alice"
+          },
+          "pin": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Pin"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "pin"
+        ],
+        "title": "DemoLogin"
+      },
+      "ExecutionReceipt": {
+        "properties": {
+          "receipt_id": {
+            "type": "string",
+            "title": "Receipt Id"
+          },
+          "plan_id": {
+            "type": "string",
+            "title": "Plan Id"
+          },
+          "plan_version": {
+            "type": "integer",
+            "title": "Plan Version"
+          },
+          "step_id": {
+            "type": "string",
+            "title": "Step Id"
+          },
+          "action_hash": {
+            "type": "string",
+            "title": "Action Hash"
+          },
+          "operation": {
+            "type": "string",
+            "title": "Operation"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "succeeded",
+              "scheduled"
+            ],
+            "title": "Status"
+          },
+          "transaction_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transaction Id"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "receipt_id",
+          "plan_id",
+          "plan_version",
+          "step_id",
+          "action_hash",
+          "operation",
+          "status",
+          "data",
+          "created_at"
+        ],
+        "title": "ExecutionReceipt"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "PlanInput": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "PlanInput"
+      },
+      "PolicyCommand": {
+        "properties": {
+          "plan_id": {
+            "type": "string",
+            "title": "Plan Id"
+          },
+          "step_id": {
+            "type": "string",
+            "title": "Step Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "plan_id",
+          "step_id"
+        ],
+        "title": "PolicyCommand"
+      },
+      "PolicyEvaluation": {
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "green",
+              "yellow",
+              "red"
+            ],
+            "title": "Level"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "spent_today_cents": {
+            "type": "integer",
+            "title": "Spent Today Cents"
+          },
+          "constraints": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConstraintSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "level",
+          "reason",
+          "spent_today_cents"
+        ],
+        "title": "PolicyEvaluation"
+      },
+      "ReadAction": {
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Account Id"
+          },
+          "tool": {
+            "type": "string",
+            "enum": [
+              "balance",
+              "transactions",
+              "analyze_bills",
+              "subscriptions",
+              "commitments",
+              "recipients"
+            ],
+            "title": "Tool"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "month",
+              "30d"
+            ],
+            "title": "Period",
+            "default": "month"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "account_id",
+          "tool"
+        ],
+        "title": "ReadAction"
+      },
+      "ReceiptVerification": {
+        "properties": {
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          },
+          "receipt_id": {
+            "type": "string",
+            "title": "Receipt Id"
+          },
+          "source": {
+            "type": "string",
+            "const": "banking_backend",
+            "title": "Source"
+          },
+          "checked_at": {
+            "type": "string",
+            "title": "Checked At"
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/ExecutionReceipt"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "verified",
+          "receipt_id",
+          "source",
+          "checked_at",
+          "receipt"
+        ],
+        "title": "ReceiptVerification"
+      },
+      "RecipientList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RecipientView"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "RecipientList"
+      },
+      "RecipientView": {
+        "properties": {
+          "recipient_id": {
+            "type": "string",
+            "title": "Recipient Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "recipient_id",
+          "name"
+        ],
+        "title": "RecipientView"
+      },
+      "ScheduleAction": {
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Account Id"
+          },
+          "tool": {
+            "type": "string",
+            "const": "schedule_transfer",
+            "title": "Tool"
+          },
+          "recipient_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Recipient Id"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "maximum": 100000000.0,
+            "minimum": 1.0,
+            "title": "Amount Cents"
+          },
+          "due_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Due At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "account_id",
+          "tool",
+          "recipient_id",
+          "amount_cents",
+          "due_at"
+        ],
+        "title": "ScheduleAction"
+      },
+      "SubscriptionList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionView"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "SubscriptionList"
+      },
+      "SubscriptionView": {
+        "properties": {
+          "subscription_id": {
+            "type": "string",
+            "title": "Subscription Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "title": "Amount Cents"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "subscription_id",
+          "name",
+          "amount_cents",
+          "active"
+        ],
+        "title": "SubscriptionView"
+      },
+      "TaskPlan": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "0.1",
+            "title": "Schema Version",
+            "default": "0.1"
+          },
+          "plan_id": {
+            "type": "string",
+            "title": "Plan Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "default": 1
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "planner": {
+            "type": "string",
+            "enum": [
+              "rules",
+              "ollama",
+              "structured",
+              "schedule"
+            ],
+            "title": "Planner"
+          },
+          "minimum_balance_cents": {
+            "type": "integer",
+            "title": "Minimum Balance Cents",
+            "default": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "planned",
+              "waiting_approval",
+              "executing",
+              "succeeded",
+              "failed",
+              "paused"
+            ],
+            "title": "Status",
+            "default": "planned"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/TaskStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "plan_id",
+          "title",
+          "planner",
+          "steps",
+          "created_at"
+        ],
+        "title": "TaskPlan"
+      },
+      "TaskStep": {
+        "properties": {
+          "step_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Step Id"
+          },
+          "depends_on": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Depends On"
+          },
+          "action": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReadAction"
+              },
+              {
+                "$ref": "#/components/schemas/TransferAction"
+              },
+              {
+                "$ref": "#/components/schemas/ScheduleAction"
+              },
+              {
+                "$ref": "#/components/schemas/CancelAction"
+              }
+            ],
+            "title": "Action",
+            "discriminator": {
+              "propertyName": "tool",
+              "mapping": {
+                "analyze_bills": "#/components/schemas/ReadAction",
+                "balance": "#/components/schemas/ReadAction",
+                "cancel_subscription": "#/components/schemas/CancelAction",
+                "commitments": "#/components/schemas/ReadAction",
+                "recipients": "#/components/schemas/ReadAction",
+                "schedule_transfer": "#/components/schemas/ScheduleAction",
+                "subscriptions": "#/components/schemas/ReadAction",
+                "transactions": "#/components/schemas/ReadAction",
+                "transfer": "#/components/schemas/TransferAction"
+              }
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "planned",
+              "waiting_approval",
+              "executing",
+              "succeeded",
+              "failed",
+              "paused"
+            ],
+            "title": "Status",
+            "default": "planned"
+          },
+          "risk_level": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "green",
+                  "yellow",
+                  "red"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Level"
+          },
+          "approval_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Id"
+          },
+          "receipt_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Id"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "step_id",
+          "action"
+        ],
+        "title": "TaskStep"
+      },
+      "TransactionList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TransactionView"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "TransactionList"
+      },
+      "TransactionView": {
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "title": "Transaction Id"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "title": "Amount Cents"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "memo": {
+            "type": "string",
+            "title": "Memo"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "transaction_id",
+          "amount_cents",
+          "category",
+          "memo",
+          "created_at"
+        ],
+        "title": "TransactionView"
+      },
+      "TransferAction": {
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Account Id"
+          },
+          "tool": {
+            "type": "string",
+            "const": "transfer",
+            "title": "Tool"
+          },
+          "recipient_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Recipient Id"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "maximum": 100000000.0,
+            "minimum": 1.0,
+            "title": "Amount Cents"
+          },
+          "commitment_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commitment Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "account_id",
+          "tool",
+          "recipient_id",
+          "amount_cents"
+        ],
+        "title": "TransferAction"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}
