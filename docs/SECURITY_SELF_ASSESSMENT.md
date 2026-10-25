@@ -1,6 +1,6 @@
 # 0.4安全自评报告
 
-基准日期2026-10-25。本地158项自动化测试通过，失败0；独立解压环境运行20组真实HTTP场景及重启恢复，独立sqlite3只读验收通过。所有数据合成，报告是MVP功能与攻击边界自评，不是银行合规认证或完整红队结论。准确证据见reports/tests.xml、context-http-smoke.json、sandbox-http-smoke.json、independent-deployment.json与mvp-acceptance.json。
+基准日期2026-10-25。本地158项自动化测试通过，失败0；独立解压环境运行20组真实HTTP场景及重启恢复，独立sqlite3只读验收通过。所有数据合成，报告是MVP功能与攻击边界自评，不是银行合规认证或完整红队结论。准确证据见CI artifacts、context-http-smoke.json、sandbox-http-smoke.json、independent-deployment.json与mvp-acceptance.json。
 
 ## 资产、主体与边界
 
@@ -39,17 +39,17 @@
 
 Windows x64 CPython3.12离线包内19个wheel逐项SHA256锁定；新目录新venv，在PIP_NO_INDEX=1条件实际安装、HTTP执行和重启恢复。源码ZIP与清单逐文件校验；不包含.env、真实密钥、数据库、开发venv、node_modules或Git历史。离线包不包含Python解释器，其他平台在线安装仍需可信软件源。
 
-运行依赖及前端锁文件未新增供应商SDK。reports/pip-audit.json与npm-audit.json沿用此前扫描（当次无已知漏洞），本轮未重新联网查询漏洞库；不把旧扫描称为当前安全保证。哈希锁定证明包与清单一致，不能证明上游包无恶意。
+运行依赖及前端锁文件未新增供应商SDK。依赖扫描在CI中执行，结果保存为artifacts；旧扫描快照已移除，不以历史结果代替当前检查。哈希锁定证明包与清单一致，不能证明上游包无恶意。
 
 ## 未完成与可接受演示限制
 
 1. 本机DeepSeek真实服务已接通，两项合成候选生成通过；误解/漏意图率及复杂语言评测未完成。受控响应测试只能证明适配和后端边界；规则演示不能代表模型能力。
 2. 2026-10-25再次尝试浏览器工具初始化失败（kernel assets / 系统找不到指定的路径）。仅完成TypeScript构建与独立HTTP资产检查，尚未完成0.4按钮点击和可访问性验收。
-3. 本机无Docker；0.4[远端CI](https://github.com/ThreshoLdnnis/pact-v2/actions/runs/40113574011)已通过测试、契约、前端/依赖检查及Docker四组HTTP场景；2026-10-25用户已授权整理GitHub，以草稿PR #8与接口评审Issue承载变更；未代发群或冻结共享协议。历史CI、截图、PPT按原版本保留。
+3. 本机无Docker；0.4[远端CI](https://github.com/ThreshoLdnnis/pact-v2/actions/runs/40113574011)已通过测试、契约、前端/依赖检查及Docker四组HTTP场景；2026-10-25用户已授权整理GitHub，现有实现经PR #8整合进入main，保留接口评审记录；未代发群或冻结共享协议。过时截图与PPT已移除，历史记录可在Git/PR查阅。
 4. 演示PIN允许合成身份切换；模拟码直接显示在演示界面，不是真实MFA。真实系统需要独立客户认证和真正强验证。
 5. SQLite单进程写锁、同步节点编排适合小规模演示；无容量、跨区容灾、分布式授权及通用数据库迁移验收。意图协调不是资金冻结，已完成付款不能被晚到请求自动撤回。
 6. 本地审计链没有外部锚点或WORM，宿主/数据库管理员可重算。非本版安全认证目标。
 7. 仅一次订阅预留和合成取消，没有商户协议恢复、真实冲正/退款、挂失等完整银行能力。中断不是抢占银行提交，也不是分布式补偿系统。
 8. 赛事最终提交格式、外部模型使用及官方验收细节仍需团队核对；不声称微众内部生产DAG公开或已取得其认证。
 
-共享接口变更说明与模板位于INTERFACE_NOTICE_0.4.md、INTERFACE_CHANGES.md。当前按用户授权提交草稿PR评审；合并与冻结前仍需补齐团队同步和负责人回复。
+共享接口变更模板位于INTERFACE_CHANGES.md。此次main整合由仓库所有者明确授权；团队群记录与负责人回复不能据此虚构，后续共享变更仍需同步。

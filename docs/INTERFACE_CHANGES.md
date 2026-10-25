@@ -27,10 +27,8 @@ Issue / 协议 PR / 文档链接：
 期望确认时间：
 ```
 
-## 变更记录
+## 当前协议与历史记录
 
-| 日期 | 变更单 | 内容 | 沟通证据 | 结论 |
-| --- | --- | --- | --- | --- |
-| 2026-10-24 | [首次共享协议评审 #1](https://github.com/ThreshoLdnnis/pact-v2/issues/1) | 初始协议与端口草案 | 待团队同步 | 草案，未批准 |
+当前字段、API和状态以[API](API.md)、[状态协议](STATE_MACHINE.md)、contracts/models.py及生成协议为准；不再维护按版本重复的接口通知文件。
 
-| 2026-10-25 | [0.4接口评审 #10](https://github.com/ThreshoLdnnis/pact-v2/issues/10) | 可复用模板、上下文/冲突/中断与测试控制 | 用户授权提交草稿PR #8；群同步与负责人回复待补 | 待评审，未冻结 |
+历史共享评审为Issue #1、#7、#9、#10；当前未完成事项集中于[Issue #11](https://github.com/ThreshoLdnnis/pact-v2/issues/11)。main整合由仓库所有者明确授权，不虚构团队群消息或其他成员回复，后续共享变更仍遵守以上沟通流程。

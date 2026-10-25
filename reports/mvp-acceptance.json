@@ -1,11 +1,10 @@
 {
   "version": "0.4.0",
   "date": "2026-10-25",
-  "source": "0.4 implementation submitted for draft PR review; main not merged; no credentials published",
+  "source": "current 0.4 implementation consolidated for main; individual evidence retains its measured source revision",
   "tests": {
     "total": 158,
     "failed": 0,
-    "new_since_0_3": 49,
     "warning": "upstream FastAPI TestClient/httpx deprecation; no test failures"
   },
   "frontend": {
@@ -51,7 +50,7 @@
   "security": {
     "independent_oracle": "passed",
     "oracle_checks_final_restart": 201,
-    "dependency_scan": "historical results retained; no new dependency or fresh network audit in this round"
+    "dependency_scan": "CI artifacts; obsolete scan snapshots removed from Git"
   },
   "not_validated": [
     "browser interaction",

@@ -30,3 +30,8 @@ build/
 Thumbs.db
 .idea/
 .vscode/
+
+# Generated verification artifacts are uploaded by CI, not versioned.
+reports/tests.xml
+reports/pip-audit.json
+reports/npm-audit.json

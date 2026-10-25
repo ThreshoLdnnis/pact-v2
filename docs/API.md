@@ -1,8 +1,6 @@
-当前协议0.4，本轮在本地实现，尚未团队群同步冻结；本轮提交草稿PR #8评审。完整精确字段以contracts/openapi.json和task-protocol.schema.json为准。
-
 # PACT 协议 0.4 与 API
 
-状态：可运行的评审实现，尚未群同步/冻结。代码唯一来源为 contracts/models.py。运行 python scripts/export_contracts.py 生成完整 OpenAPI、Banking Tool OpenAPI、Task Protocol JSON Schema 和前端 protocol.ts。
+当前运行协议0.4，代码唯一来源为 contracts/models.py。运行 python scripts/export_contracts.py 生成完整 OpenAPI、Banking Tool OpenAPI、Task Protocol JSON Schema 和前端 protocol.ts。
 
 ## 通用规则
 
@@ -26,7 +24,7 @@ Task Protocol 负责候选、DAG 与状态。Banking Tool Protocol 负责规范�
 | ExecutionReceipt | receipt_id, plan_id, plan_version, step_id, action_hash, operation, status, transaction_id, data, created_at | Banking 后端 |
 | BankingCommand | plan_id, plan_version, step_id, idempotency_key, action | 调用方提交，后端与已保存步骤逐字段比对 |
 
-0.3增加TaskStep的template_id、template_instance_id、template_version（仅服务端生成），以及TaskPlan.ready_step_ids（依赖满足的节点，不表示已经授权）。CandidatePlan仍拒绝运行字段和安全字段。取消动作会自动补齐查询节点，因此步骤数量和确认次数与0.2不同。
+TaskStep的template_id、template_instance_id、template_version由服务端生成；TaskPlan.ready_step_ids只表示依赖满足。取消动作自动补齐黄色查询节点，模型不能删除。
 
 组合接口示例：两个独立前置业务、转账等待二者核验。每个instance的step_id也是该业务模板的出口；内部查询节点由服务端补齐，不由调用方删除。
 
@@ -41,7 +39,7 @@ Task Protocol 负责候选、DAG 与状态。Banking Tool Protocol 负责规范�
 }
 ```
 
-测试管理API见[SANDBOX_TESTING.md](SANDBOX_TESTING.md)。它们不属于Banking Tool API，不得交给模型。审批scope_hash自0.3开始同时绑定depends_on；旧未消费授权在执行时按新绑定检查，不会自动继承。
+测试管理API见[SANDBOX_TESTING.md](SANDBOX_TESTING.md)。它们不属于Banking Tool API，不得交给模型。审批scope_hash同时绑定depends_on；旧未消费授权在执行时按新绑定检查，不会自动继承。
 
 ## 路由目录
 
@@ -95,17 +93,13 @@ transfer 为 {tool,account_id,recipient_id或recipient_query,amount_cents,commit
 
 定时登记回执 status=scheduled、paid=false，登记不等于付款。成功付款回执 status=succeeded 且有 transaction_id。Agent 只有查验 verified=true 后才能将步骤标为 succeeded。
 
-## 0.2行为变化与兼容
+## 快照、兼容与结果
 
-- 0.2时新写入TaskPlan.schema_version=0.2；读取接受0.1历史计划。TaskPlan增加progress及handoff；TaskStep增加clarification；ApprovalRequest增加scope_hash，绑定主体、版本、步骤、动作和最低留存。旧缺失scope_hash的审批需重新发起，不能沿用。
-- GET /banking/accounts/{id}/subscriptions未提供receipt_id时403。提供本人/本账户、确有已消费黄色确认的查询回执时，只返回原查询快照（source_receipt_id、snapshot_at），不返回实时数据。新的查询仍走subscriptions候选→确认→执行。旧绿色回执、其他工具回执不适用。
-- 绿色commitments接口隐藏单项订阅协议详情，增加subscription_reserved_cents；commitment-graph仅显示合计节点。银行内部约束仍包含完整预留。取消仅释放未到期承诺，不作历史退款。
-- 账单结果增加transaction_ids和anomalies；当前非转账消费≥3000元只是待核查提示。
-- 新状态waiting_clarification、pending_verification、partially_completed、handed_off见STATE_MACHINE.md。执行响应receipt=null也可能表示待澄清/待核验，请检查plan.status。
-- 此前客户端需更新枚举、订阅读取和人工处理交互；/api/v1路径保留不等于冻结的0.1客户端完全兼容。生成协议与工作台已一起更新，尚未完成团队群确认。
-- 本次未改变跨场景动作顺序、依赖或跨DAG冲突调度。明确的新业务边界见BUSINESS_DAGS.md。
+订阅GET无receipt_id时403；本人本账户且已消费黄色确认的查询回执只返回原快照，不能借旧回执读取实时状态。绿色commitments与commitment-graph隐藏单项订阅协议明细，内部资金校验仍包含完整预留。
 
-## 0.4消息、冲突与中断
+读取兼容历史0.1/0.2/0.3计划，新写入0.4；审批必须符合当前scope_hash绑定，旧授权不能自动继承。账单transaction_ids提供来源，非转账消费≥3000元只是待核查提示。路径仍为/api/v1不代表任意旧客户端完全兼容。
+
+## 消息、冲突与中断
 
 所有路径均以/api/v1为前缀、使用本人Bearer会话，错误{error:{code,message,details?}}。
 

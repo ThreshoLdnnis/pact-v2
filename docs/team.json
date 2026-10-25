@@ -20,7 +20,7 @@
       "github": "morebadly",
       "paths": [
         "services/policy/",
-        "tests/security/"
+        "tests/"
       ]
     },
     "D": {
@@ -28,7 +28,9 @@
       "github": null,
       "paths": [
         "apps/workbench/",
-        "infra/"
+        "Dockerfile",
+        "compose.yaml",
+        "scripts/bootstrap.py"
       ]
     }
   }

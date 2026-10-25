@@ -1,13 +1,27 @@
-name: MVP validation
+name: PACT CI
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, chore/team-setup]
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: pact-ci-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  PACT_MODEL_PROVIDER: rules
 jobs:
+  repo-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: git show --format= --check HEAD
+      - run: python3 scripts/check_repository.py
   test-and-build:
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -27,7 +41,7 @@ jobs:
       - run: python -m pytest --junitxml=reports/tests.xml
       - run: python scripts/export_contracts.py
       - run: git diff --exit-code -- contracts apps/workbench/src/protocol.ts
-      - run: npm ci && npm run build && npm audit
+      - run: npm ci && npm run build && npm audit --json > ../../reports/npm-audit.json
         working-directory: apps/workbench
       - run: python -m pip_audit -r requirements.txt --no-deps --disable-pip -f json -o reports/pip-audit.json
       - uses: actions/upload-artifact@v4
