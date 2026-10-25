@@ -1,0 +1,82 @@
+name: PACT CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pact-ci-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  PACT_MODEL_PROVIDER: rules
+jobs:
+  repo-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: git show --format= --check HEAD
+      - run: python3 scripts/check_repository.py
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/workbench/package-lock.json
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest --junitxml=reports/tests.xml
+      - run: python scripts/export_contracts.py
+      - run: git diff --exit-code -- contracts apps/workbench/src/protocol.ts
+      - run: npm ci && npm run build && npm audit --json > ../../reports/npm-audit.json
+        working-directory: apps/workbench
+      - run: python -m pip_audit -r requirements.txt --no-deps --disable-pip -f json -o reports/pip-audit.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-evidence
+          path: reports/
+  docker-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PACT_SANDBOX_CONTROLS: '1'
+      PACT_SANDBOX_ADMIN_TOKEN: ci-synthetic-only-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: docker compose up --build -d
+      - name: Wait for health
+        run: |
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:8000/health; then break; fi
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:8000/health
+      - run: python scripts/smoke_http.py
+      - run: python scripts/smoke_business.py
+      - run: python scripts/smoke_sandbox.py
+      - run: python scripts/smoke_context.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sandbox-http-evidence
+          path: reports/*http*.json
+      - run: docker compose logs --tail 100
+        if: always()
+      - run: docker compose down -v
+        if: always()

@@ -1,0 +1,13 @@
+{
+  "workflow": "(analysis || subscription query -> cancellation) -> transfer",
+  "status": "passed",
+  "plan_id": "plan_af9224b215364ee8b630b8294de54458",
+  "receipt_ids": [
+    "rec_d8faf43e97f845bb9573b64ba381d902",
+    "rec_cd9a8bc3edd948c3b20329e04ca1969c",
+    "rec_dadc5237a2464416a96afe70160f4664",
+    "rec_2467e90acb1f4d51b5715033bc833fc5"
+  ],
+  "balance_delta_cents": -50000,
+  "verified": true
+}

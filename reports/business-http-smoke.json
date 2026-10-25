@@ -1,0 +1,12 @@
+{
+  "status": "passed",
+  "version": "0.4",
+  "cases": [
+    "yellow_subscription_query_and_snapshot",
+    "same_name_selection_then_separate_approval",
+    "handoff_blocks_resume_and_requires_new_approval",
+    "partial_completion_preserves_payment"
+  ],
+  "balance_delta_cents": -30000,
+  "balanced": true
+}

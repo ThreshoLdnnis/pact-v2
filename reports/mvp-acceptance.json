@@ -1,0 +1,71 @@
+{
+  "version": "0.4.0",
+  "date": "2026-10-25",
+  "source": "current 0.4 implementation consolidated for main; individual evidence retains its measured source revision",
+  "tests": {
+    "total": 158,
+    "failed": 0,
+    "warning": "upstream FastAPI TestClient/httpx deprecation; no test failures"
+  },
+  "frontend": {
+    "typescript": "passed",
+    "vite": "passed",
+    "http_assets": "passed",
+    "browser_clicks": "not completed; kernel asset initialization failed"
+  },
+  "http": {
+    "main_workflow": 1,
+    "business": 4,
+    "sandbox": 6,
+    "context_conflict": 9,
+    "total": 20,
+    "status": "passed"
+  },
+  "independent_deployment": {
+    "passed": true,
+    "fresh_directory": true,
+    "fresh_venv": true,
+    "offline_pip_no_index": true,
+    "windows_python": "CPython 3.12 x64",
+    "requires_codex": false,
+    "requires_node": false,
+    "restart_persistence": true,
+    "verified_source_files": 50
+  },
+  "protocols": {
+    "deterministic_export": true,
+    "sha256": {
+      "contracts/task-protocol.schema.json": "3137d576205bde8043af409586971ff3863fee7a9fb86e6a4e6f4a709ad22316",
+      "contracts/openapi.json": "82a803f328aadbade5a5f5e30c2c47b2c12b9fd796b28c93d2305dbf7ebe57d9",
+      "contracts/banking-tool.openapi.json": "1d213fda329c1e10110863585ac954b609e10a39f7118cb1a6a63e4df283f5d0",
+      "apps/workbench/src/protocol.ts": "e0540b31c83ee0140068d3b5cffa481ed184d8c813edeb227523fc6cc97ec137"
+    }
+  },
+  "model": {
+    "openai_compatible": "controlled response tests passed",
+    "ollama": "controlled response tests passed",
+    "live_provider": "DeepSeek deepseek-flash/json_object: two real synthetic candidate cases passed; no banking execution",
+    "real_nlu_quality": "two candidate smoke cases passed; broad evaluation not completed"
+  },
+  "security": {
+    "independent_oracle": "passed",
+    "oracle_checks_final_restart": 201,
+    "dependency_scan": "CI artifacts; obsolete scan snapshots removed from Git"
+  },
+  "not_validated": [
+    "browser interaction",
+    "broad live model semantic evaluation",
+    "official submission format and final contest acceptance"
+  ],
+  "github_ci": {
+    "status": "success",
+    "run_id": 40113574011,
+    "url": "https://github.com/ThreshoLdnnis/pact-v2/actions/runs/40113574011",
+    "validated_code_commit": "88608894e6b0901cb72d500c9bd06ddf7f814ed4",
+    "jobs": [
+      "test-and-build",
+      "docker-smoke"
+    ],
+    "repository_checks_run_id": 40113573990
+  }
+}

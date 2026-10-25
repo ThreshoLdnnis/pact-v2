@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-25",
+  "provider": "DeepSeek",
+  "model": "deepseek-flash",
+  "format": "json_object",
+  "scope": "live synthetic candidate generation only; no bank writes or execution",
+  "cases": [
+    {
+      "case": "balance_read",
+      "passed": true,
+      "source": "openai_compatible",
+      "steps": [
+        {
+          "step_id": "step-1",
+          "tool": "balance",
+          "depends_on": []
+        }
+      ],
+      "elapsed_seconds": 0.97
+    },
+    {
+      "case": "three_business_composition",
+      "passed": true,
+      "source": "openai_compatible",
+      "steps": [
+        {
+          "step_id": "analyze-bills",
+          "tool": "analyze_bills",
+          "depends_on": []
+        },
+        {
+          "step_id": "cancel-subscription",
+          "tool": "cancel_subscription",
+          "depends_on": [
+            "analyze-bills"
+          ]
+        },
+        {
+          "step_id": "transfer-zhang",
+          "tool": "transfer",
+          "depends_on": [
+            "cancel-subscription",
+            "analyze-bills"
+          ]
+        }
+      ],
+      "elapsed_seconds": 4.56
+    }
+  ],
+  "passed": true
+}

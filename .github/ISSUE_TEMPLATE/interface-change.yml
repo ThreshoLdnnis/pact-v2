@@ -1,0 +1,46 @@
+name: 公共接口或端口变更
+description: 新增、修改或废弃共享接口/端口前使用，先群同步再修改
+title: "[接口变更] 变更标题"
+body:
+  - type: dropdown
+    id: change_type
+    attributes:
+      label: 变更类型
+      options:
+        - 新增
+        - 修改
+        - 废弃
+    validations:
+      required: true
+  - type: textarea
+    id: purpose
+    attributes:
+      label: 用途与原因
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: HTTP 方法/路径、端口、请求与响应
+      description: 附字段、类型、错误码、幂等与权限说明，以及前后差异。
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: 影响模块、兼容/迁移方案、所需评审人
+    validations:
+      required: true
+  - type: textarea
+    id: communication
+    attributes:
+      label: 团队群同步证据与负责人回复
+      description: 填消息链接，或时间、原文摘要和相关负责人确认；未沟通不能宣告已批准。
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: 文档更新与验证计划
+    validations:
+      required: true

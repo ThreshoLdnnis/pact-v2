@@ -1,0 +1,18 @@
+[project]
+name = "pact-v2"
+version = "0.4.0"
+description = "Synthetic banking agent sandbox with server-enforced policy and verified receipts"
+requires-python = ">=3.12"
+dependencies = ["fastapi>=0.115", "sqlalchemy>=2.0", "uvicorn>=0.34", "httpx>=0.28", "tzdata>=2024.1"]
+
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["pact*", "services*", "contracts*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
